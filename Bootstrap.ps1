@@ -11,9 +11,16 @@
 
     This script requires NO external dependencies - only built-in PowerShell features.
 
+.PARAMETER AllowAdmin
+    Allow execution with admin privileges (for Administrator accounts only)
+
 .EXAMPLE
     .\Bootstrap.ps1
     Downloads and installs complete development environment
+
+.EXAMPLE
+    .\Bootstrap.ps1 -AllowAdmin
+    For Administrator accounts: allow execution with admin privileges
 
 .NOTES
     - Must run with NORMAL user permissions (NOT admin)
@@ -21,21 +28,31 @@
     - Temporary files are automatically cleaned up after installation
 #>
 
-# === Reject Admin Execution ===
+param(
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowAdmin
+)
+
+# === Reject Admin Execution (unless explicitly allowed) ===
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-if ($isAdmin) {
-    Write-Host "❌ 錯誤：此腳本不應以管理員權限執行" -ForegroundColor Red
+if ($isAdmin -and -not $AllowAdmin) {
+    Write-Host "❌ 錯誤：檢測到以管理員權限執行" -ForegroundColor Red
     Write-Host ""
     Write-Host "原因：" -ForegroundColor Yellow
-    Write-Host "  - 此腳本會自動管理權限" -ForegroundColor Yellow
-    Write-Host "  - 子腳本需要 admin 時會自動提權（彈出 UAC）" -ForegroundColor Yellow
     Write-Host "  - 以 admin 執行會導致 user 權限的腳本失敗" -ForegroundColor Yellow
+    Write-Host "  - npm/pip packages 會安裝到系統目錄（權限問題）" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "請以「一般用戶權限」重新執行此腳本" -ForegroundColor Cyan
+    Write-Host "如果您是 Administrator 帳戶且確定要繼續，請使用：" -ForegroundColor Cyan
+    Write-Host "  .\Bootstrap.ps1 -AllowAdmin" -ForegroundColor White
     Write-Host ""
     Read-Host "按 Enter 鍵結束..."
     exit 1
+}
+
+if ($AllowAdmin -and $isAdmin) {
+    Write-Host "⚠️  警告：以 Admin 權限執行（已使用 -AllowAdmin 參數）" -ForegroundColor Yellow
+    Write-Host ""
 }
 
 # --- 腳本開始 ---
@@ -95,7 +112,11 @@ Write-Host ""
 Push-Location $repoDir
 
 try {
-    & "$repoDir\Quick-Install.ps1"
+    if ($AllowAdmin) {
+        & "$repoDir\Quick-Install.ps1" -AllowAdmin
+    } else {
+        & "$repoDir\Quick-Install.ps1"
+    }
     $installExitCode = $LASTEXITCODE
 } catch {
     Write-Host "❌ 安裝過程發生錯誤：$($_.Exception.Message)" -ForegroundColor Red

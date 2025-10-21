@@ -7,26 +7,43 @@
     Install-* scripts will self-elevate when needed (UAC prompts).
     Setup-* scripts run with normal user permissions.
 
+.PARAMETER AllowAdmin
+    Allow execution with admin privileges (for Administrator accounts only)
+
 .EXAMPLE
     .\Quick-Reinstall.ps1
     Force reinstalls all tools and packages
+
+.EXAMPLE
+    .\Quick-Reinstall.ps1 -AllowAdmin
+    For Administrator accounts: allow execution with admin privileges
 #>
 
-# === Reject Admin Execution ===
+param(
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowAdmin
+)
+
+# === Reject Admin Execution (unless explicitly allowed) ===
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-if ($isAdmin) {
-    Write-Host "❌ 錯誤：此腳本不應以管理員權限執行" -ForegroundColor Red
+if ($isAdmin -and -not $AllowAdmin) {
+    Write-Host "❌ 錯誤：檢測到以管理員權限執行" -ForegroundColor Red
     Write-Host ""
     Write-Host "原因：" -ForegroundColor Yellow
-    Write-Host "  - 此腳本會自動管理權限" -ForegroundColor Yellow
-    Write-Host "  - 子腳本需要 admin 時會自動提權（彈出 UAC）" -ForegroundColor Yellow
     Write-Host "  - 以 admin 執行會導致 user 權限的腳本失敗" -ForegroundColor Yellow
+    Write-Host "  - npm/pip packages 會安裝到系統目錄（權限問題）" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "請以「一般用戶權限」重新執行此腳本" -ForegroundColor Cyan
+    Write-Host "如果您是 Administrator 帳戶且確定要繼續，請使用：" -ForegroundColor Cyan
+    Write-Host "  .\Quick-Reinstall.ps1 -AllowAdmin" -ForegroundColor White
     Write-Host ""
     Read-Host "按 Enter 鍵結束..."
     exit 1
+}
+
+if ($AllowAdmin -and $isAdmin) {
+    Write-Host "⚠️  警告：以 Admin 權限執行（已使用 -AllowAdmin 參數）" -ForegroundColor Yellow
+    Write-Host ""
 }
 
 # Color output functions
