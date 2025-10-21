@@ -64,12 +64,35 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 Write-Step "Installing Platform Tools"
 
 $PlatformDir = Join-Path $ScriptDir "platform\windows"
-$InstallScripts = Get-ChildItem -Path $PlatformDir -Filter "Install-*.ps1" -ErrorAction SilentlyContinue
+
+# Step 1: Install winget first (prerequisite for other tools)
+$WingetScript = Join-Path $PlatformDir "Install-Winget.ps1"
+if (Test-Path $WingetScript) {
+    Write-Info "Installing Winget (prerequisite)..."
+    & $WingetScript
+
+    if ($LASTEXITCODE -ne 0 -and -not $?) {
+        Write-Host ""
+        Write-Host "❌ Winget installation failed" -ForegroundColor Red
+        Write-Host "Setup cannot continue" -ForegroundColor Red
+        Write-Host "Please check the error messages above and try again" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+
+    Write-Success "Winget installation completed"
+    Write-Host ""
+}
+
+# Step 2: Install other tools (excluding winget)
+$InstallScripts = Get-ChildItem -Path $PlatformDir -Filter "Install-*.ps1" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne "Install-Winget.ps1" }
 
 if (-not $InstallScripts) {
-    Write-Warning "No installation scripts found in $PlatformDir"
+    Write-Warning "No additional installation scripts found in $PlatformDir"
 } else {
-    Write-Info "Found $($InstallScripts.Count) installation script(s)"
+    Write-Info "Found $($InstallScripts.Count) additional installation script(s)"
     Write-Host ""
 
     foreach ($script in $InstallScripts) {
