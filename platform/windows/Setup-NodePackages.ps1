@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    Setup Node.js global packages in user directory
+    Install Node.js global packages
 
 .DESCRIPTION
-    Configures npm to install global packages in user directory (no admin required).
-    Installs commonly used development packages.
+    Installs Node.js global packages in user directory.
+    Requires Setup-NodeJS.ps1 to be run first.
     Rejects execution with admin privileges to avoid permission issues.
 
 .PARAMETER Upgrade
@@ -47,7 +47,7 @@ if ($isAdmin) {
 }
 
 # --- 腳本開始 ---
-Write-Host "--- Node.js Global Packages 配置 ---" -ForegroundColor Cyan
+Write-Host "--- Node.js Global Packages 安裝腳本 ---" -ForegroundColor Cyan
 
 # 處理互斥參數
 if ($Force -and $Upgrade) {
@@ -55,13 +55,24 @@ if ($Force -and $Upgrade) {
     $Upgrade = $false
 }
 
-# 步驟 1: 檢查 Node.js 是否已安裝
-Write-Host "`n1. 正在檢查 Node.js..." -ForegroundColor Yellow
+# 步驟 1: 檢查 Node.js 和 npm 環境
+Write-Host "`n1. 正在檢查 Node.js 和 npm 環境..." -ForegroundColor Yellow
+
+# 刷新環境變數以確保 node/npm 可用
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+
 $nodeExists = Get-Command node -ErrorAction SilentlyContinue
+$npmExists = Get-Command npm -ErrorAction SilentlyContinue
 
 if (-not $nodeExists) {
     Write-Host "❌ 錯誤：未找到 Node.js" -ForegroundColor Red
-    Write-Host "請先執行 Quick-Install.ps1 安裝 Node.js" -ForegroundColor Yellow
+    Write-Host "請先執行 Install-NodeJS.ps1 安裝 Node.js" -ForegroundColor Yellow
+    exit 1
+}
+
+if (-not $npmExists) {
+    Write-Host "❌ 錯誤：未找到 npm" -ForegroundColor Red
+    Write-Host "請先執行 Setup-NodeJS.ps1 配置 npm 環境" -ForegroundColor Yellow
     exit 1
 }
 
@@ -70,85 +81,71 @@ $npmVersion = (npm -v).Trim()
 Write-Host "   - Node.js: $nodeVersion" -ForegroundColor Green
 Write-Host "   - npm: $npmVersion" -ForegroundColor Green
 
-# 步驟 2: 配置 npm global prefix
-Write-Host "`n2. 正在配置 npm global 目錄..." -ForegroundColor Yellow
+# 步驟 2: 安裝 global packages
+Write-Host "`n2. 正在安裝 global packages..." -ForegroundColor Yellow
 
-$npmGlobalPath = "$env:USERPROFILE\.npm-global"
-
-# 建立目錄
-if (-not (Test-Path $npmGlobalPath)) {
-    New-Item -Path $npmGlobalPath -ItemType Directory -Force | Out-Null
-    Write-Host "   - 建立目錄：$npmGlobalPath" -ForegroundColor Gray
-}
-
-# 設定 npm prefix
-npm config set prefix $npmGlobalPath
-Write-Host "   - npm prefix 設定為：$npmGlobalPath" -ForegroundColor Green
-
-# 步驟 3: 加入 PATH
-Write-Host "`n3. 正在更新 PATH 環境變數..." -ForegroundColor Yellow
-
-$userPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
-if ($userPath -notlike "*$npmGlobalPath*") {
-    [System.Environment]::SetEnvironmentVariable('Path', "$npmGlobalPath;$userPath", 'User')
-    $env:Path = "$npmGlobalPath;$env:Path"
-    Write-Host "   - 已加入 PATH：$npmGlobalPath" -ForegroundColor Green
-} else {
-    Write-Host "   - PATH 已包含 npm global 目錄" -ForegroundColor Cyan
-}
-
-# 步驟 4: 安裝 global packages
-Write-Host "`n4. 正在安裝 global packages..." -ForegroundColor Yellow
-
-# 定義要安裝的 packages
+# 定義要安裝的 packages (目前為空，用戶可自行添加)
 $packages = @(
-    "typescript",
-    "ts-node",
-    "eslint",
-    "prettier",
-    "nodemon",
-    "pm2",
-    "@nestjs/cli",
-    "create-react-app",
-    "create-next-app"
+    # 範例 (已註解)：
+    # "typescript",
+    # "ts-node",
+    # "eslint",
+    # "prettier",
+    # "nodemon",
+    # "pm2",
+    # "@nestjs/cli",
+    # "create-react-app",
+    # "create-next-app"
 )
 
-Write-Host "   - 將安裝 $($packages.Count) 個 packages" -ForegroundColor Cyan
-Write-Host ""
+if ($packages.Count -eq 0) {
+    Write-Host "   - packages 列表為空，跳過安裝" -ForegroundColor Cyan
+    Write-Host "   - 如需安裝 packages，請編輯此腳本的 `$packages 數組" -ForegroundColor Gray
+} else {
+    Write-Host "   - 將安裝 $($packages.Count) 個 packages" -ForegroundColor Cyan
+    Write-Host ""
 
-foreach ($package in $packages) {
-    Write-Host "   安裝 $package..." -ForegroundColor Gray
+    foreach ($package in $packages) {
+        Write-Host "   安裝 $package..." -ForegroundColor Gray
 
-    if ($Force) {
-        npm install -g $package --force | Out-Null
-    } elseif ($Upgrade) {
-        npm install -g $package@latest | Out-Null
-    } else {
-        # 檢查是否已安裝
-        $installed = npm list -g $package --depth=0 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "      ✓ 已安裝，跳過" -ForegroundColor DarkGray
-            continue
+        if ($Force) {
+            npm install -g $package --force | Out-Null
+        } elseif ($Upgrade) {
+            npm install -g $package@latest | Out-Null
+        } else {
+            # 檢查是否已安裝
+            $installed = npm list -g $package --depth=0 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "      ✓ 已安裝，跳過" -ForegroundColor DarkGray
+                continue
+            }
+            npm install -g $package | Out-Null
         }
-        npm install -g $package | Out-Null
-    }
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "      ✓ $package 完成" -ForegroundColor Green
-    } else {
-        Write-Host "      ✗ $package 失敗" -ForegroundColor Red
-        exit 1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "      ✓ $package 完成" -ForegroundColor Green
+        } else {
+            Write-Host "      ✗ $package 失敗" -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
 # --- 完成 ---
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Node.js Global Packages 配置完成！"
-Write-Host "安裝目錄：$npmGlobalPath"
+Write-Host "Node.js Global Packages 安裝完成！"
 Write-Host "========================================"
 Write-Host ""
-Write-Host "已安裝的 global packages：" -ForegroundColor Cyan
-npm list -g --depth=0
-Write-Host ""
+
+if ($packages.Count -gt 0) {
+    Write-Host "已安裝的 global packages：" -ForegroundColor Cyan
+    npm list -g --depth=0
+    Write-Host ""
+} else {
+    Write-Host "提示：目前沒有安裝任何 global packages" -ForegroundColor Cyan
+    Write-Host "如需安裝，請編輯此腳本的 `$packages 數組" -ForegroundColor Cyan
+    Write-Host ""
+}
+
 exit 0

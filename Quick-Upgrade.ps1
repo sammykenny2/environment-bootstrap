@@ -100,9 +100,10 @@ Write-Host ""
 
 # Define Setup-* execution order (dependencies matter)
 $setupOrder = @(
-    "Setup-Python.ps1",         # Install pyenv-win first
-    "Setup-PythonPackages.ps1", # Depends on pyenv-win
-    "Setup-NodePackages.ps1"    # Independent (Node.js already installed)
+    "Setup-Python.ps1",         # Install pyenv-win and Python
+    "Setup-PythonPackages.ps1", # Depends on Setup-Python.ps1
+    "Setup-NodeJS.ps1",         # Configure npm environment
+    "Setup-NodePackages.ps1"    # Depends on Setup-NodeJS.ps1
 )
 
 foreach ($scriptName in $setupOrder) {
