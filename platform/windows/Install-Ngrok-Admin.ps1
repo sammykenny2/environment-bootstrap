@@ -127,13 +127,22 @@ if ($useWinget) {
             Write-Host "   - 正在安裝 Ngrok..." -ForegroundColor Gray
         }
 
-        Invoke-Expression $command
+        $output = Invoke-Expression $command 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
 
-        if ($LASTEXITCODE -eq 0) {
+        # Winget exit codes:
+        # 0 = Success
+        # -1978335189 (0x8A15002B) = No applicable update found (already latest)
+
+        if ($exitCode -eq 0) {
             Write-Host "   - Ngrok 安裝成功！" -ForegroundColor Green
             $installSuccess = $true
+        } elseif (($Upgrade -and $ngrokExists) -and ($exitCode -eq -1978335189)) {
+            Write-Host "   - Ngrok 已是最新版本！" -ForegroundColor Green
+            $installSuccess = $true
         } else {
-            Write-Host "⚠️  winget 安裝失敗，將嘗試 fallback 方法" -ForegroundColor Yellow
+            Write-Host "⚠️  winget 安裝失敗 (exit code: $exitCode)" -ForegroundColor Yellow
+            Write-Host "   - 將嘗試 fallback 方法" -ForegroundColor Yellow
             $installSuccess = $false
         }
     } catch {
@@ -154,7 +163,13 @@ if (-not $installSuccess) {
         $installDir = "$env:ProgramFiles\ngrok"
 
         Write-Host "   - 正在下載 Ngrok..." -ForegroundColor Gray
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipFile -UseBasicParsing
+        $ProgressPreference = 'Continue'  # Show download progress
+        try {
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $zipFile -UseBasicParsing
+            Write-Host "   - 下載完成！" -ForegroundColor Green
+        } finally {
+            $ProgressPreference = 'SilentlyContinue'  # Restore default
+        }
 
         Write-Host "   - 正在解壓縮..." -ForegroundColor Gray
 
