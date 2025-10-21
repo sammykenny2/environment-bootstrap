@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Quick reinstall script for development environment
 
@@ -113,7 +113,7 @@ foreach ($scriptName in $adminScripts) {
     $toolName = $scriptName -replace '^Install-(.+)-Admin\.ps1$', '$1'
     Write-Info "Reinstalling $toolName (may require UAC)..."
 
-    & $scriptPath -Force
+    & $scriptPath -Force -NonInteractive
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
@@ -191,7 +191,9 @@ Write-Success "All tools reinstalled successfully"
 Write-Host ""
 Write-Info "Next steps:"
 Write-Host "  1. Close this PowerShell window"
-Write-Host "  2. Open a NEW PowerShell window (to load updated PATH)"
+Write-Host "  2. Open a NEW PowerShell window"
 Write-Host "  3. Start developing!"
+Write-Host ""
+Write-Info "Note: New PowerShell window required for environment changes to take effect"
 Write-Host ""
 Write-Info "For help, see: README.md"

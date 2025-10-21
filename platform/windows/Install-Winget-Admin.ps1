@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Install or upgrade Windows Package Manager (winget)
 
@@ -32,7 +32,10 @@ param(
     [switch]$Upgrade,
 
     [Parameter(Mandatory=$false)]
-    [switch]$Force
+    [switch]$Force,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NonInteractive
 )
 
 # === Self-Elevation Logic ===
@@ -45,6 +48,7 @@ if (-not $isAdmin) {
     $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
     if ($Upgrade) { $arguments += " -Upgrade" }
     if ($Force) { $arguments += " -Force" }
+    if ($NonInteractive) { $arguments += " -NonInteractive" }
 
     # Elevate and execute
     try {
@@ -79,7 +83,9 @@ if ($wingetExists) {
         Write-Host "   - 使用 -Upgrade 參數，將升級到最新版本。" -ForegroundColor Yellow
     } else {
         Write-Host "   - 無需重複安裝。如需升級請使用 -Upgrade 參數。" -ForegroundColor Cyan
-        Read-Host "按 Enter 鍵結束..."
+        if (-not $NonInteractive) {
+            Read-Host "按 Enter 鍵結束..."
+        }
         exit 0
     }
 } else {
@@ -103,7 +109,12 @@ try {
     Write-Host ""
 
     # 等待用戶確認安裝完成
-    $response = Read-Host "   安裝完成後請輸入 Y 繼續驗證，或輸入 N 改用自動下載方式 (Y/N)"
+    if ($NonInteractive) {
+        Write-Host "   [NonInteractive mode] Skipping Microsoft Store, using auto-download..." -ForegroundColor Yellow
+        $response = 'N'
+    } else {
+        $response = Read-Host "   安裝完成後請輸入 Y 繼續驗證，或輸入 N 改用自動下載方式 (Y/N)"
+    }
 
     if ($response -eq 'Y' -or $response -eq 'y') {
         Write-Host "`n   - 正在驗證 winget 安裝..." -ForegroundColor Gray
@@ -121,7 +132,9 @@ try {
             Write-Host "winget 操作完成！"
             Write-Host "請關閉此視窗，並「重新開啟一個新的 PowerShell 視窗」再繼續後續操作。"
             Write-Host "========================================"
-            Read-Host "按 Enter 鍵結束..."
+            if (-not $NonInteractive) {
+                Read-Host "按 Enter 鍵結束..."
+            }
             exit 0
         } else {
             Write-Host "   - 未檢測到 winget，將改用自動下載方式..." -ForegroundColor Yellow
@@ -190,7 +203,9 @@ try {
     Write-Host ""
     Write-Host "或前往：https://github.com/microsoft/winget-cli/releases/latest" -ForegroundColor Yellow
     Write-Host ""
-    Read-Host "按 Enter 鍵結束..."
+    if (-not $NonInteractive) {
+        Read-Host "按 Enter 鍵結束..."
+    }
     exit 1
 }
 
@@ -200,5 +215,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "winget 操作完成！"
 Write-Host "請關閉此視窗，並「重新開啟一個新的 PowerShell 視窗」再繼續後續操作。"
 Write-Host "========================================"
-Read-Host "按 Enter 鍵結束..."
+if (-not $NonInteractive) {
+    Read-Host "按 Enter 鍵結束..."
+}
 exit 0

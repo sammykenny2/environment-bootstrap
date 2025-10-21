@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Install or upgrade Node.js LTS using Windows Package Manager (winget)
 
@@ -41,7 +41,10 @@ param(
     [switch]$Upgrade,
 
     [Parameter(Mandatory=$false)]
-    [switch]$Force
+    [switch]$Force,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NonInteractive
 )
 
 # === Self-Elevation Logic ===
@@ -55,6 +58,7 @@ if (-not $isAdmin) {
     if ($Version -ne "LTS") { $arguments += " -Version `"$Version`"" }
     if ($Upgrade) { $arguments += " -Upgrade" }
     if ($Force) { $arguments += " -Force" }
+    if ($NonInteractive) { $arguments += " -NonInteractive" }
 
     # Elevate and execute
     try {
@@ -89,7 +93,9 @@ if ($nodeExists) {
         Write-Host "   - 使用 -Upgrade 參數，將升級到最新版本。" -ForegroundColor Yellow
     } else {
         Write-Host "   - 無需重複安裝。如需升級請使用 -Upgrade 參數。" -ForegroundColor Cyan
+        if (-not $NonInteractive) {
         Read-Host "按 Enter 鍵結束..."
+        }
         exit 0
     }
 } else {
@@ -101,7 +107,9 @@ Write-Host "`n3. 正在檢查 Winget 套件管理器..." -ForegroundColor Yellow
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     Write-Host "錯誤：找不到 Winget 工具。此腳本需要 Winget。" -ForegroundColor Red
     Write-Host "請確認您的 Windows 11 已更新，或從 Microsoft Store 安裝 'App Installer'。"
+    if (-not $NonInteractive) {
     Read-Host "按 Enter 鍵結束..."
+    }
     exit 1
 }
 Write-Host "   - Winget 檢查通過。" -ForegroundColor Green
@@ -149,7 +157,9 @@ if ($Upgrade -and $nodeExists) {
         Write-Host "   - 重要：您需要開啟一個「新的」PowerShell 視窗來讓環境變數生效。" -ForegroundColor Yellow
     } catch {
         Write-Host "錯誤：升級過程中發生問題: $($_.Exception.Message)" -ForegroundColor Red
+        if (-not $NonInteractive) {
         Read-Host "按 Enter 鍵結束..."
+        }
         exit 1
     }
 } else {
@@ -180,7 +190,9 @@ if ($Upgrade -and $nodeExists) {
         Write-Host "   - 重要：您需要開啟一個「新的」PowerShell 視窗來讓環境變數生效。" -ForegroundColor Yellow
     } catch {
         Write-Host "錯誤：安裝過程中發生問題: $($_.Exception.Message)" -ForegroundColor Red
+        if (-not $NonInteractive) {
         Read-Host "按 Enter 鍵結束..."
+        }
         exit 1
     }
 }
@@ -203,5 +215,7 @@ if ($nodeCheck) {
 }
 
 Write-Host ""
+if (-not $NonInteractive) {
 Read-Host "按 Enter 鍵結束..."
+}
 exit 0

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Setup Node.js environment in user directory
 
@@ -105,9 +105,14 @@ if (-not (Test-Path $npmGlobalPath)) {
     Write-Host "   - 建立目錄：$npmGlobalPath" -ForegroundColor Gray
 }
 
-# 設定 npm prefix
-npm config set prefix $npmGlobalPath
-Write-Host "   - npm prefix 設定為：$npmGlobalPath" -ForegroundColor Green
+# 檢查並設定 npm prefix
+$currentPrefix = (npm config get prefix 2>&1).Trim()
+if ($currentPrefix -ne $npmGlobalPath) {
+    npm config set prefix $npmGlobalPath
+    Write-Host "   - npm prefix 設定為：$npmGlobalPath" -ForegroundColor Green
+} else {
+    Write-Host "   - npm prefix 已正確配置：$npmGlobalPath" -ForegroundColor Cyan
+}
 
 # 步驟 3: 加入 PATH
 Write-Host "`n3. 正在更新 PATH 環境變數..." -ForegroundColor Yellow
@@ -133,16 +138,25 @@ if ($npmExists) {
     $currentNpmVersion = (npm -v).Trim()
     Write-Host "   - 當前 npm 版本：$currentNpmVersion" -ForegroundColor Cyan
 
+    # 检查远程最新版本
     try {
-        Write-Host "   - 正在升級 npm 到最新版本..." -ForegroundColor Gray
-        npm install -g npm@latest 2>&1 | Out-Null
-
-        if ($LASTEXITCODE -eq 0) {
-            $newNpmVersion = (npm -v).Trim()
-            Write-Host "   - npm 升級成功！新版本：$newNpmVersion" -ForegroundColor Green
+        Write-Host "   - 正在檢查遠程最新版本..." -ForegroundColor Gray
+        $latestNpmVersion = (npm view npm version 2>&1).Trim()
+        
+        if ($currentNpmVersion -eq $latestNpmVersion) {
+            Write-Host "   - npm 已是最新版本 ($currentNpmVersion)，跳過升級" -ForegroundColor Green
         } else {
-            Write-Host "⚠️  npm 升級失敗" -ForegroundColor Yellow
-            exit 1
+            Write-Host "   - 可升級版本：$currentNpmVersion -> $latestNpmVersion" -ForegroundColor Yellow
+            Write-Host "   - 正在升級 npm..." -ForegroundColor Gray
+            npm install -g npm@latest 2>&1 | Out-Null
+
+            if ($LASTEXITCODE -eq 0) {
+                $newNpmVersion = (npm -v).Trim()
+                Write-Host "   - npm 升級成功！新版本：$newNpmVersion" -ForegroundColor Green
+            } else {
+                Write-Host "⚠️  npm 升級失敗" -ForegroundColor Yellow
+                exit 1
+            }
         }
     } catch {
         Write-Host "❌ npm 升級時發生錯誤：$($_.Exception.Message)" -ForegroundColor Red

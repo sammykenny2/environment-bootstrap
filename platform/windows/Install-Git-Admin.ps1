@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Install or upgrade Git for Windows using Windows Package Manager (winget)
 
@@ -31,7 +31,10 @@ param(
     [switch]$Upgrade,
 
     [Parameter(Mandatory=$false)]
-    [switch]$Force
+    [switch]$Force,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NonInteractive
 )
 
 # === Self-Elevation Logic ===
@@ -44,6 +47,7 @@ if (-not $isAdmin) {
     $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
     if ($Upgrade) { $arguments += " -Upgrade" }
     if ($Force) { $arguments += " -Force" }
+    if ($NonInteractive) { $arguments += " -NonInteractive" }
 
     # Elevate and execute
     try {
@@ -94,7 +98,9 @@ if ($gitExists) {
         Write-Host "   - 使用 -Upgrade 參數，將升級到最新版本。" -ForegroundColor Yellow
     } else {
         Write-Host "   - 無需重複安裝。如需升級請使用 -Upgrade 參數。" -ForegroundColor Cyan
+        if (-not $NonInteractive) {
         Read-Host "按 Enter 鍵結束..."
+        }
         exit 0
     }
 } else {
@@ -187,7 +193,9 @@ if (-not $installSuccess) {
     } catch {
         Write-Host "❌ Git 安裝失敗：$($_.Exception.Message)" -ForegroundColor Red
         Write-Host "   - 請手動從 https://git-scm.com/download/win 下載安裝" -ForegroundColor Yellow
+        if (-not $NonInteractive) {
         Read-Host "按 Enter 鍵結束..."
+        }
         exit 1
     }
 }
@@ -207,5 +215,7 @@ if ($gitCheck) {
 }
 
 Write-Host ""
+if (-not $NonInteractive) {
 Read-Host "按 Enter 鍵結束..."
+}
 exit 0

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Install or upgrade PowerShell 7
 
@@ -33,7 +33,10 @@ param(
     [switch]$Upgrade,
 
     [Parameter(Mandatory=$false)]
-    [switch]$Force
+    [switch]$Force,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NonInteractive
 )
 
 # === Self-Elevation Logic ===
@@ -46,6 +49,7 @@ if (-not $isAdmin) {
     $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
     if ($Upgrade) { $arguments += " -Upgrade" }
     if ($Force) { $arguments += " -Force" }
+    if ($NonInteractive) { $arguments += " -NonInteractive" }
 
     # Elevate and execute
     try {

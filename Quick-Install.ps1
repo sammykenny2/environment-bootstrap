@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Quick install script for development environment
 
@@ -113,7 +113,7 @@ foreach ($scriptName in $adminScripts) {
     $toolName = $scriptName -replace '^Install-(.+)-Admin\.ps1$', '$1'
     Write-Info "Installing $toolName (may require UAC)..."
 
-    & $scriptPath
+    & $scriptPath -NonInteractive
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
@@ -179,6 +179,11 @@ if (Test-Path $CheckScript) {
     Write-Info "Skipping environment verification"
 }
 
+# Reload PATH for current session
+Write-Host ""
+Write-Info "Refreshing environment variables for current session..."
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+
 # Summary
 Write-Host ""
 Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Green
@@ -191,7 +196,9 @@ Write-Success "All tools installed successfully"
 Write-Host ""
 Write-Info "Next steps:"
 Write-Host "  1. Close this PowerShell window"
-Write-Host "  2. Open a NEW PowerShell window (to load updated PATH)"
+Write-Host "  2. Open a NEW PowerShell window"
 Write-Host "  3. Start developing!"
+Write-Host ""
+Write-Info "Note: New PowerShell window required for environment changes to take effect"
 Write-Host ""
 Write-Info "For help, see: README.md"
