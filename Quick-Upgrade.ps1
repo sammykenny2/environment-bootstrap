@@ -2,15 +2,15 @@
 
 <#
 .SYNOPSIS
-    Quick setup script for development environment
+    Quick upgrade script for development environment
 
 .DESCRIPTION
-    Automates the setup of development environment from scratch.
-    Installs all available platform tools automatically.
+    Upgrades all platform tools to their latest versions.
+    Installs tools that are missing.
 
 .EXAMPLE
-    .\Quick-Setup.ps1
-    Sets up complete development environment
+    .\Quick-Upgrade.ps1
+    Upgrades all tools to latest versions
 #>
 
 # Color output functions
@@ -43,7 +43,7 @@ Clear-Host
 Write-Host @"
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║         Environment Bootstrap - Quick Setup               ║
+║        Environment Bootstrap - Quick Upgrade              ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 "@ -ForegroundColor Cyan
@@ -60,8 +60,8 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     exit 1
 }
 
-# Install all platform tools
-Write-Step "Installing Platform Tools"
+# Upgrade all platform tools
+Write-Step "Upgrading Platform Tools"
 
 $PlatformDir = Join-Path $ScriptDir "platform\windows"
 $InstallScripts = Get-ChildItem -Path $PlatformDir -Filter "Install-*.ps1" -ErrorAction SilentlyContinue
@@ -74,21 +74,22 @@ if (-not $InstallScripts) {
 
     foreach ($script in $InstallScripts) {
         $toolName = $script.BaseName -replace '^Install-', ''
-        Write-Info "Installing $toolName..."
+        Write-Info "Upgrading $toolName..."
 
-        & $script.FullName
+        # Pass -Upgrade parameter to install scripts
+        & $script.FullName -Upgrade
 
         if ($LASTEXITCODE -ne 0 -and -not $?) {
             Write-Host ""
-            Write-Host "❌ $toolName installation failed" -ForegroundColor Red
-            Write-Host "Setup cannot continue" -ForegroundColor Red
+            Write-Host "❌ $toolName upgrade failed" -ForegroundColor Red
+            Write-Host "Upgrade cannot continue" -ForegroundColor Red
             Write-Host "Please check the error messages above and try again" -ForegroundColor Yellow
             Write-Host ""
             Read-Host "Press Enter to exit"
             exit 1
         }
 
-        Write-Success "$toolName installation completed"
+        Write-Success "$toolName upgrade completed"
         Write-Host ""
     }
 }
@@ -108,11 +109,11 @@ if (Test-Path $CheckScript) {
 Write-Host ""
 Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Green
 Write-Host "║                                                           ║" -ForegroundColor Green
-Write-Host "║                  Setup Complete! 🎉                       ║" -ForegroundColor Green
+Write-Host "║                Upgrade Complete! 🎉                       ║" -ForegroundColor Green
 Write-Host "║                                                           ║" -ForegroundColor Green
 Write-Host "╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
-Write-Success "Environment bootstrap completed successfully"
+Write-Success "All tools upgraded successfully"
 Write-Host ""
 Write-Info "Next steps:"
 Write-Host "  1. Close this PowerShell window"
