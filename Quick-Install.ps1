@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Quick install script for development environment
 
@@ -113,7 +113,7 @@ foreach ($scriptName in $adminScripts) {
     $toolName = $scriptName -replace '^Install-(.+)-Admin\.ps1$', '$1'
     Write-Info "Installing $toolName (may require UAC)..."
 
-    & $scriptPath
+    & $scriptPath -NonInteractive
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
