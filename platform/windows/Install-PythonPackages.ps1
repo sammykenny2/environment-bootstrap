@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Installs Python development packages using pip.
-    Requires Setup-Python.ps1 to be run first.
+    Requires Install-Python.ps1 to be run first.
     All operations in user directory (no admin required).
     Rejects execution with admin privileges to avoid permission issues.
 
@@ -14,17 +14,24 @@
 .PARAMETER Force
     Force reinstall all packages
 
+.PARAMETER AllowAdmin
+    Allow execution with admin privileges (for Administrator accounts only)
+
 .EXAMPLE
-    .\Setup-PythonPackages.ps1
+    .\Install-PythonPackages.ps1
     Default: Install packages if missing
 
 .EXAMPLE
-    .\Setup-PythonPackages.ps1 -Upgrade
+    .\Install-PythonPackages.ps1 -Upgrade
     Upgrade all packages to latest versions
 
 .EXAMPLE
-    .\Setup-PythonPackages.ps1 -Force
+    .\Install-PythonPackages.ps1 -Force
     Force reinstall all packages
+
+.EXAMPLE
+    .\Install-PythonPackages.ps1 -AllowAdmin
+    For Administrator accounts: allow execution with admin privileges
 #>
 
 param(
@@ -32,19 +39,32 @@ param(
     [switch]$Upgrade,
 
     [Parameter(Mandatory=$false)]
-    [switch]$Force
+    [switch]$Force,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowAdmin
 )
 
-# === Reject Admin Privileges ===
+# === Reject Admin Execution (unless explicitly allowed) ===
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-if ($isAdmin) {
-    Write-Host "❌ 錯誤：此腳本不應以管理員權限執行" -ForegroundColor Red
+if ($isAdmin -and -not $AllowAdmin) {
+    Write-Host "❌ 錯誤：檢測到以管理員權限執行" -ForegroundColor Red
     Write-Host ""
-    Write-Host "原因：Python packages 應安裝在用戶目錄，避免權限問題" -ForegroundColor Yellow
-    Write-Host "母腳本應以一般權限執行，子腳本會在需要時自動提權" -ForegroundColor Yellow
+    Write-Host "原因：" -ForegroundColor Yellow
+    Write-Host "  - 以 admin 執行會導致 user 權限的腳本失敗" -ForegroundColor Yellow
+    Write-Host "  - pip packages 會安裝到系統目錄（權限問題）" -ForegroundColor Yellow
     Write-Host ""
+    Write-Host "如果您是 Administrator 帳戶且確定要繼續，請使用：" -ForegroundColor Cyan
+    Write-Host "  .\Install-PythonPackages.ps1 -AllowAdmin" -ForegroundColor White
+    Write-Host ""
+    Read-Host "按 Enter 鍵結束..."
     exit 1
+}
+
+if ($AllowAdmin -and $isAdmin) {
+    Write-Host "⚠️  警告：以 Admin 權限執行（已使用 -AllowAdmin 參數）" -ForegroundColor Yellow
+    Write-Host ""
 }
 
 # --- 腳本開始 ---

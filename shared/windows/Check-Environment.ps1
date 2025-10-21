@@ -1,6 +1,51 @@
-# Check-Environment.ps1
-# 檢查開發環境設定
+<#
+.SYNOPSIS
+    Check development environment setup
 
+.DESCRIPTION
+    Checks if all required tools and environment variables are properly configured.
+    This is a read-only diagnostic script.
+
+.PARAMETER AllowAdmin
+    Allow execution with admin privileges (for Administrator accounts only)
+
+.EXAMPLE
+    .\Check-Environment.ps1
+    Check environment setup with standard output
+
+.EXAMPLE
+    .\Check-Environment.ps1 -AllowAdmin
+    For Administrator accounts: allow execution with admin privileges
+#>
+
+param(
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowAdmin
+)
+
+# === Reject Admin Execution (unless explicitly allowed) ===
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if ($isAdmin -and -not $AllowAdmin) {
+    Write-Host "❌ 錯誤：檢測到以管理員權限執行" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "原因：" -ForegroundColor Yellow
+    Write-Host "  - 環境檢查應以實際使用者權限執行" -ForegroundColor Yellow
+    Write-Host "  - 以 admin 執行可能顯示不正確的環境資訊" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "如果您是 Administrator 帳戶且確定要繼續，請使用：" -ForegroundColor Cyan
+    Write-Host "  .\Check-Environment.ps1 -AllowAdmin" -ForegroundColor White
+    Write-Host ""
+    Read-Host "按 Enter 鍵結束..."
+    exit 1
+}
+
+if ($AllowAdmin -and $isAdmin) {
+    Write-Host "⚠️  警告：以 Admin 權限執行（已使用 -AllowAdmin 參數）" -ForegroundColor Yellow
+    Write-Host ""
+}
+
+# --- 腳本開始 ---
 Write-Host "===================================" -ForegroundColor Cyan
 Write-Host "檢查開發環境設定" -ForegroundColor Cyan
 Write-Host "===================================" -ForegroundColor Cyan
