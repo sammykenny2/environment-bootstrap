@@ -173,8 +173,8 @@ if (-not $installSuccess) {
             [System.Environment]::SetEnvironmentVariable("Path", "$installDir;$machinePath", "Machine")
         }
 
-        # 刷新當前 session 的環境變數
-        $env:Path = "$installDir;" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        # 刷新當前 session PATH（完整讀取 Machine + User）
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 
         # 驗證安裝
         $ngrokCheck = Get-Command ngrok -ErrorAction SilentlyContinue

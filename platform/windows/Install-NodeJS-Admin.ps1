@@ -189,6 +189,19 @@ if ($Upgrade -and $nodeExists) {
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "Node.js 操作完成！"
 Write-Host "請關閉此視窗，並「重新開啟一個新的 PowerShell 視窗」再繼續後續操作。"
-Write-Host "========================================"
+Write-Host "========================================" -ForegroundColor Cyan
+
+# 顯示版本資訊（刷新 PATH 後驗證）
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+$nodeCheck = Get-Command node -ErrorAction SilentlyContinue
+if ($nodeCheck) {
+    $nodeVersion = (node -v).Trim()
+    $npmVersion = (npm -v).Trim()
+    Write-Host "`n已安裝版本：" -ForegroundColor Green
+    Write-Host "  - Node.js: $nodeVersion" -ForegroundColor Green
+    Write-Host "  - npm: $npmVersion" -ForegroundColor Green
+}
+
+Write-Host ""
 Read-Host "按 Enter 鍵結束..."
 exit 0

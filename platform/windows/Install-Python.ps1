@@ -194,8 +194,8 @@ if (-not $pyenvExists -or $Force -or $Upgrade) {
                 [System.Environment]::SetEnvironmentVariable('Path', "$PyEnvBin;$PyEnvShims;$UserPath", 'User')
             }
 
-            # 刷新當前 session 的環境變數
-            $env:Path = "$PyEnvBin;$PyEnvShims;" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+            # 刷新當前 session PATH（完整讀取 User + Machine）
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
 
             Write-Host "   - pyenv-win 安裝成功！" -ForegroundColor Green
 

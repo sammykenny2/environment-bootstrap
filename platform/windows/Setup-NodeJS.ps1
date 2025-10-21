@@ -115,7 +115,8 @@ Write-Host "`n3. 正在更新 PATH 環境變數..." -ForegroundColor Yellow
 $userPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
 if ($userPath -notlike "*$npmGlobalPath*") {
     [System.Environment]::SetEnvironmentVariable('Path', "$npmGlobalPath;$userPath", 'User')
-    $env:Path = "$npmGlobalPath;$env:Path"
+    # 刷新當前 session PATH（完整讀取 User + Machine）
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     Write-Host "   - 已加入 PATH：$npmGlobalPath" -ForegroundColor Green
 } else {
     Write-Host "   - PATH 已包含 npm global 目錄" -ForegroundColor Cyan
