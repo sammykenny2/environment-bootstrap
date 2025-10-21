@@ -1,5 +1,3 @@
-#Requires -RunAsAdministrator
-
 <#
 .SYNOPSIS
     Install or upgrade Node.js LTS using Windows Package Manager (winget)
@@ -7,6 +5,7 @@
 .DESCRIPTION
     Checks and installs Node.js LTS. Includes npm automatically.
     Supports upgrade and force reinstall modes.
+    Self-elevates to Administrator when needed.
 
 .PARAMETER Version
     Version to install. Options: LTS (default), Latest, or specific version (e.g., "20.10.0")
@@ -45,7 +44,29 @@ param(
     [switch]$Force
 )
 
-# --- 腳本開始 ---
+# === Self-Elevation Logic ===
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if (-not $isAdmin) {
+    Write-Host "🔒 需要管理員權限，正在提權..." -ForegroundColor Cyan
+
+    # Rebuild parameter list
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    if ($Version -ne "LTS") { $arguments += " -Version `"$Version`"" }
+    if ($Upgrade) { $arguments += " -Upgrade" }
+    if ($Force) { $arguments += " -Force" }
+
+    # Elevate and execute
+    try {
+        $process = Start-Process powershell.exe -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+        exit $process.ExitCode
+    } catch {
+        Write-Host "❌ UAC 取消或提權失敗" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# === Already have Admin, continue with actual work ===
 Write-Host "--- Node.js LTS 環境安裝腳本 ---" -ForegroundColor Cyan
 
 # 處理互斥參數
@@ -53,16 +74,6 @@ if ($Force -and $Upgrade) {
     Write-Host "⚠️  警告：不能同時使用 -Force 和 -Upgrade，將使用 -Force" -ForegroundColor Yellow
     $Upgrade = $false
 }
-
-# 步驟 1: 檢查是否以系統管理員身分執行
-Write-Host "`n1. 正在檢查權限..." -ForegroundColor Yellow
-if (-not ([System.Security.Principal.WindowsPrincipal][System.Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "錯誤：此腳本需要系統管理員權限來安裝軟體。" -ForegroundColor Red
-    Write-Host "請使用滑鼠右鍵點擊 PowerShell 圖示，選擇「以系統管理員身分執行」。"
-    Read-Host "按 Enter 鍵結束..."
-    exit 1
-}
-Write-Host "   - 系統管理員權限檢查通過。" -ForegroundColor Green
 
 # 步驟 2: 檢查 Node.js 是否已安裝
 Write-Host "`n2. 正在檢查 Node.js 是否已安裝..." -ForegroundColor Yellow

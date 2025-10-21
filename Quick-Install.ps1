@@ -1,16 +1,15 @@
-#Requires -RunAsAdministrator
-
 <#
 .SYNOPSIS
     Quick install script for development environment
 
 .DESCRIPTION
-    Installs all missing platform tools automatically.
-    Skips tools that are already installed.
+    Installs all missing platform tools and sets up development packages.
+    Install-* scripts will self-elevate when needed (UAC prompts).
+    Setup-* scripts run with normal user permissions.
 
 .EXAMPLE
     .\Quick-Install.ps1
-    Installs all missing development tools
+    Installs all tools and sets up development environment
 #>
 
 # Color output functions
@@ -49,31 +48,47 @@ Write-Host @"
 "@ -ForegroundColor Cyan
 
 Write-Info "Platform: Windows"
+Write-Info "Note: Install-* scripts will prompt for UAC when needed"
 Write-Host ""
 
-# Check if running as Administrator
-if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host ""
-    Write-Host "❌ This script must be run as Administrator" -ForegroundColor Red
-    Write-Host ""
-    Read-Host "Press Enter to exit"
-    exit 1
-}
-
-# Install all platform tools
-Write-Step "Installing Platform Tools"
+# Process all Install-* and Setup-* scripts
+Write-Step "Installing Tools and Setting Up Environment"
 
 $PlatformDir = Join-Path $ScriptDir "platform\windows"
 
-# Step 1: Install winget first (prerequisite for other tools)
-$WingetScript = Join-Path $PlatformDir "Install-Winget.ps1"
-if (Test-Path $WingetScript) {
-    Write-Info "Installing Winget (prerequisite)..."
-    & $WingetScript
+# Get all Install-* and Setup-* scripts, sorted alphabetically
+# This ensures Install-* scripts run before Setup-* scripts
+$allScripts = Get-ChildItem -Path $PlatformDir -Filter "*.ps1" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '^(Install|Setup)-.*\.ps1$' } |
+    Sort-Object Name
 
-    if ($LASTEXITCODE -ne 0 -and -not $?) {
+if (-not $allScripts) {
+    Write-Warning "No installation or setup scripts found in $PlatformDir"
+    exit 0
+}
+
+Write-Info "Found $($allScripts.Count) script(s) to execute"
+Write-Host ""
+
+foreach ($script in $allScripts) {
+    # Determine script type and tool name
+    if ($script.Name -match '^Install-(.+)\.ps1$') {
+        $toolName = $Matches[1]
+        Write-Info "Installing $toolName (may require UAC)..."
+    } elseif ($script.Name -match '^Setup-(.+)\.ps1$') {
+        $toolName = $Matches[1]
+        Write-Info "Setting up $toolName..."
+    } else {
+        continue
+    }
+
+    # Execute script
+    & $script.FullName
+
+    # Check exit code
+    if ($LASTEXITCODE -ne 0) {
         Write-Host ""
-        Write-Host "❌ Winget installation failed" -ForegroundColor Red
+        Write-Host "❌ $toolName failed with exit code $LASTEXITCODE" -ForegroundColor Red
         Write-Host "Setup cannot continue" -ForegroundColor Red
         Write-Host "Please check the error messages above and try again" -ForegroundColor Yellow
         Write-Host ""
@@ -81,39 +96,8 @@ if (Test-Path $WingetScript) {
         exit 1
     }
 
-    Write-Success "Winget installation completed"
+    Write-Success "$toolName completed"
     Write-Host ""
-}
-
-# Step 2: Install other tools (excluding winget)
-$InstallScripts = Get-ChildItem -Path $PlatformDir -Filter "Install-*.ps1" -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -ne "Install-Winget.ps1" }
-
-if (-not $InstallScripts) {
-    Write-Warning "No additional installation scripts found in $PlatformDir"
-} else {
-    Write-Info "Found $($InstallScripts.Count) additional installation script(s)"
-    Write-Host ""
-
-    foreach ($script in $InstallScripts) {
-        $toolName = $script.BaseName -replace '^Install-', ''
-        Write-Info "Installing $toolName..."
-
-        & $script.FullName
-
-        if ($LASTEXITCODE -ne 0 -and -not $?) {
-            Write-Host ""
-            Write-Host "❌ $toolName installation failed" -ForegroundColor Red
-            Write-Host "Setup cannot continue" -ForegroundColor Red
-            Write-Host "Please check the error messages above and try again" -ForegroundColor Yellow
-            Write-Host ""
-            Read-Host "Press Enter to exit"
-            exit 1
-        }
-
-        Write-Success "$toolName installation completed"
-        Write-Host ""
-    }
 }
 
 # Environment check
