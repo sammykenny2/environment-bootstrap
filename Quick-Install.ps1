@@ -12,6 +12,23 @@
     Installs all tools and sets up development environment
 #>
 
+# === Reject Admin Execution ===
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if ($isAdmin) {
+    Write-Host "❌ 錯誤：此腳本不應以管理員權限執行" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "原因：" -ForegroundColor Yellow
+    Write-Host "  - 此腳本會自動管理權限" -ForegroundColor Yellow
+    Write-Host "  - 子腳本需要 admin 時會自動提權（彈出 UAC）" -ForegroundColor Yellow
+    Write-Host "  - 以 admin 執行會導致 user 權限的腳本失敗" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "請以「一般用戶權限」重新執行此腳本" -ForegroundColor Cyan
+    Write-Host ""
+    Read-Host "按 Enter 鍵結束..."
+    exit 1
+}
+
 # Color output functions
 function Write-Success {
     param([string]$Message)
