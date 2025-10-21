@@ -84,18 +84,13 @@ Write-Host "   - npm: $npmVersion" -ForegroundColor Green
 # 步驟 2: 安裝 global packages
 Write-Host "`n2. 正在安裝 global packages..." -ForegroundColor Yellow
 
-# 定義要安裝的 packages (目前為空，用戶可自行添加)
+# 定義要安裝的 packages
 $packages = @(
-    # 範例 (已註解)：
-    # "typescript",
-    # "ts-node",
-    # "eslint",
-    # "prettier",
-    # "nodemon",
-    # "pm2",
-    # "@nestjs/cli",
-    # "create-react-app",
-    # "create-next-app"
+    # AI CLI Tools
+    "@anthropic-ai/claude-code",
+    "@google/gemini-cli",
+    "@openai/codex",
+    "@github/copilot"
 )
 
 if ($packages.Count -eq 0) {
