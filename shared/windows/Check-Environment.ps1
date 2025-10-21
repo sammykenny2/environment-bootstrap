@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Check development environment setup
 
@@ -126,9 +126,7 @@ Write-Host "[環境變數]" -ForegroundColor Yellow
 
 # 檢查常用環境變數
 $commonVars = @{
-    "NODE_ENV" = $env:NODE_ENV
     "PATH" = if ($env:PATH) { "(已設定)" } else { $null }
-    "HOME" = $env:HOME
     "USERPROFILE" = $env:USERPROFILE
 }
 
