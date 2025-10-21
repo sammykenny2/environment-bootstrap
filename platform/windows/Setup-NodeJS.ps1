@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Setup Node.js environment in user directory
 
@@ -133,16 +133,25 @@ if ($npmExists) {
     $currentNpmVersion = (npm -v).Trim()
     Write-Host "   - 當前 npm 版本：$currentNpmVersion" -ForegroundColor Cyan
 
+    # 检查远程最新版本
     try {
-        Write-Host "   - 正在升級 npm 到最新版本..." -ForegroundColor Gray
-        npm install -g npm@latest 2>&1 | Out-Null
-
-        if ($LASTEXITCODE -eq 0) {
-            $newNpmVersion = (npm -v).Trim()
-            Write-Host "   - npm 升級成功！新版本：$newNpmVersion" -ForegroundColor Green
+        Write-Host "   - 正在檢查遠程最新版本..." -ForegroundColor Gray
+        $latestNpmVersion = (npm view npm version 2>&1).Trim()
+        
+        if ($currentNpmVersion -eq $latestNpmVersion) {
+            Write-Host "   - npm 已是最新版本 ($currentNpmVersion)，跳過升級" -ForegroundColor Green
         } else {
-            Write-Host "⚠️  npm 升級失敗" -ForegroundColor Yellow
-            exit 1
+            Write-Host "   - 可升級版本：$currentNpmVersion -> $latestNpmVersion" -ForegroundColor Yellow
+            Write-Host "   - 正在升級 npm..." -ForegroundColor Gray
+            npm install -g npm@latest 2>&1 | Out-Null
+
+            if ($LASTEXITCODE -eq 0) {
+                $newNpmVersion = (npm -v).Trim()
+                Write-Host "   - npm 升級成功！新版本：$newNpmVersion" -ForegroundColor Green
+            } else {
+                Write-Host "⚠️  npm 升級失敗" -ForegroundColor Yellow
+                exit 1
+            }
         }
     } catch {
         Write-Host "❌ npm 升級時發生錯誤：$($_.Exception.Message)" -ForegroundColor Red
