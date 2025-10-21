@@ -59,6 +59,7 @@ $PlatformDir = Join-Path $ScriptDir "platform\windows"
 # Define Install-* execution order (dependencies matter)
 $installOrder = @(
     "Install-Winget.ps1",       # Foundation: package manager for other tools
+    "Install-Git.ps1",          # Version control (depends on winget, has fallback)
     "Install-PowerShell.ps1",   # Optional: upgrade to PowerShell 7
     "Install-NodeJS.ps1"        # Depends on winget
 )
@@ -100,10 +101,10 @@ Write-Host ""
 
 # Define Setup-* execution order (dependencies matter)
 $setupOrder = @(
-    "Setup-Python.ps1",         # Install pyenv-win and Python
-    "Setup-PythonPackages.ps1", # Depends on Setup-Python.ps1
     "Setup-NodeJS.ps1",         # Configure npm environment
-    "Setup-NodePackages.ps1"    # Depends on Setup-NodeJS.ps1
+    "Setup-NodePackages.ps1",   # Depends on Setup-NodeJS.ps1
+    "Setup-Python.ps1",         # Install pyenv-win and Python
+    "Setup-PythonPackages.ps1"  # Depends on Setup-Python.ps1
 )
 
 foreach ($scriptName in $setupOrder) {
