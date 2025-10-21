@@ -104,13 +104,21 @@ if ($wingetExists) {
         if ($Upgrade -and $pwshExists) {
             # 升級模式
             Write-Host "   - 正在升級 PowerShell 7..." -ForegroundColor Gray
-            winget upgrade --id Microsoft.PowerShell -e --silent --accept-package-agreements --accept-source-agreements
+            $output = winget upgrade --id Microsoft.PowerShell -e --silent --accept-package-agreements --accept-source-agreements 2>&1 | Out-String
+            $exitCode = $LASTEXITCODE
 
-            if ($LASTEXITCODE -eq 0) {
+            # Winget exit codes:
+            # 0 = Success
+            # -1978335189 (0x8A15002B) = No applicable update found (already latest)
+
+            if ($exitCode -eq 0) {
                 Write-Host "   - PowerShell 7 升級成功！" -ForegroundColor Green
                 $wingetSuccess = $true
+            } elseif ($exitCode -eq -1978335189) {
+                Write-Host "   - PowerShell 7 已是最新版本！" -ForegroundColor Green
+                $wingetSuccess = $true
             } else {
-                throw "Winget 升級失敗"
+                throw "Winget 升級失敗 (exit code: $exitCode)"
             }
         } else {
             # 安裝或強制重裝模式
@@ -159,10 +167,15 @@ if (-not $wingetSuccess) {
         $fileName = $asset.name
         $outputPath = Join-Path $env:TEMP $fileName
 
-        # 下載檔案
+        # 下載檔案 (with progress)
         Write-Host "   - 正在下載 $fileName ..." -ForegroundColor Gray
-        Write-Host "   - 這可能需要幾分鐘時間，請稍候..." -ForegroundColor Gray
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $outputPath -UseBasicParsing
+        $ProgressPreference = 'Continue'  # Show download progress
+        try {
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $outputPath -UseBasicParsing
+            Write-Host "   - 下載完成！" -ForegroundColor Green
+        } finally {
+            $ProgressPreference = 'SilentlyContinue'  # Restore default
+        }
 
         # 安裝 MSI
         Write-Host "   - 正在安裝..." -ForegroundColor Gray

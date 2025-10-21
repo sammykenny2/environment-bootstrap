@@ -147,13 +147,20 @@ if ($Upgrade -and $nodeExists) {
             $command += " $versionArg"
         }
 
-        Invoke-Expression $command
+        $output = Invoke-Expression $command 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
 
-        if ($LASTEXITCODE -ne 0) {
-            throw "Winget 升級失敗，請檢查網路連線或錯誤訊息。"
+        # Winget exit codes:
+        # 0 = Success
+        # -1978335189 (0x8A15002B) = No applicable update found (already latest)
+
+        if ($exitCode -eq 0) {
+            Write-Host "   - Node.js 升級成功！" -ForegroundColor Green
+        } elseif ($exitCode -eq -1978335189) {
+            Write-Host "   - Node.js 已是最新版本！" -ForegroundColor Green
+        } else {
+            throw "Winget 升級失敗 (exit code: $exitCode)，請檢查網路連線或錯誤訊息。"
         }
-
-        Write-Host "   - Node.js 升級成功！" -ForegroundColor Green
         Write-Host "   - 重要：您需要開啟一個「新的」PowerShell 視窗來讓環境變數生效。" -ForegroundColor Yellow
     } catch {
         Write-Host "錯誤：升級過程中發生問題: $($_.Exception.Message)" -ForegroundColor Red

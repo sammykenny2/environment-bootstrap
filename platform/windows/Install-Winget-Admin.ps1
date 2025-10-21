@@ -142,6 +142,29 @@ try {
     } else {
         Write-Host "`n   - 使用者選擇改用自動下載方式..." -ForegroundColor Yellow
     }
+
+    # NonInteractive mode: Check if winget is now available (might already be installed)
+    if ($NonInteractive) {
+        Write-Host "`n   - 正在檢查 winget 是否已可用..." -ForegroundColor Gray
+
+        # Refresh PATH
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+        # Check again
+        $wingetExists = Get-Command winget -ErrorAction SilentlyContinue
+        if ($wingetExists) {
+            $wingetVersion = (winget --version).Trim()
+            Write-Host "   - winget 已安裝！版本：$wingetVersion" -ForegroundColor Green
+            Write-Host "   - 跳過下載步驟。" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host "winget 操作完成！"
+            Write-Host "========================================"
+            exit 0
+        } else {
+            Write-Host "   - winget 仍不可用，繼續下載..." -ForegroundColor Yellow
+        }
+    }
 } catch {
     Write-Host "   - 打開 Microsoft Store 失敗：$($_.Exception.Message)" -ForegroundColor Yellow
     Write-Host "   - 將改用自動下載方式..." -ForegroundColor Yellow
@@ -168,10 +191,15 @@ try {
     $fileName = $asset.name
     $outputPath = Join-Path $env:TEMP $fileName
 
-    # 下載檔案
+    # 下載檔案 (with progress)
     Write-Host "   - 正在下載 $fileName ..." -ForegroundColor Gray
-    Write-Host "   - 這可能需要幾分鐘時間，請稍候..." -ForegroundColor Gray
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $outputPath -UseBasicParsing
+    $ProgressPreference = 'Continue'  # Show download progress
+    try {
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $outputPath -UseBasicParsing
+        Write-Host "   - 下載完成！" -ForegroundColor Green
+    } finally {
+        $ProgressPreference = 'SilentlyContinue'  # Restore default
+    }
 
     # 安裝 msixbundle
     Write-Host "   - 正在安裝..." -ForegroundColor Gray

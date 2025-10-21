@@ -95,7 +95,7 @@ if ($pyenvExists) {
     if ($Force) {
         Write-Host "   - 使用 -Force 參數，將強制重新安裝 pyenv-win。" -ForegroundColor Yellow
     } elseif ($Upgrade) {
-        Write-Host "   - 使用 -Upgrade 參數，將升級 pyenv-win 到最新版本。" -ForegroundColor Yellow
+        Write-Host "   - 使用 -Upgrade 參數，pyenv-win 已存在，跳過重裝。" -ForegroundColor Cyan
     } else {
         Write-Host "   - pyenv-win 已安裝，跳過。" -ForegroundColor Cyan
     }
@@ -103,8 +103,8 @@ if ($pyenvExists) {
     Write-Host "   - 系統中未找到 pyenv-win，準備開始安裝。"
 }
 
-# 步驟 2: 安裝/升級 pyenv-win (如果需要)
-if (-not $pyenvExists -or $Force -or $Upgrade) {
+# 步驟 2: 安裝/升級 pyenv-win (只在 Force 或不存在時)
+if (-not $pyenvExists -or $Force) {
     Write-Host "`n2. 正在安裝/升級 pyenv-win..." -ForegroundColor Yellow
 
     # 清理舊版本
@@ -277,19 +277,33 @@ if ($LASTEXITCODE -eq 0) {
     exit 1
 }
 
-# 步驟 6: 升級核心工具 (pip, setuptools, wheel)
-Write-Host "`n6. 正在升級核心工具..." -ForegroundColor Yellow
+# 步驟 6: 檢查/升級核心工具 (pip, setuptools, wheel)
+if ($Upgrade) {
+    Write-Host "`n6. 正在升級核心工具..." -ForegroundColor Yellow
+} else {
+    Write-Host "`n6. 正在檢查核心工具..." -ForegroundColor Yellow
+}
 
 try {
     # 檢查 pip 版本
-    $currentPipVersion = (python -m pip --version 2>&1) -replace '^pip (\S+).*', '$1'
+    $pipVersionOutput = python -m pip --version 2>&1 | Out-String
+    if ($pipVersionOutput -match 'pip\s+(\S+)') {
+        $currentPipVersion = $matches[1].Trim()
+    } else {
+        $currentPipVersion = ""
+    }
     Write-Host "   - 當前 pip 版本：$currentPipVersion" -ForegroundColor Cyan
-    
+
     # 檢查遠程最新版本
     Write-Host "   - 正在檢查 pip 最新版本..." -ForegroundColor Gray
-    $latestPipVersion = (python -m pip index versions pip 2>&1 | Select-String -Pattern "LATEST:" | ForEach-Object { $_ -replace '^.*LATEST:\s*', '' })
-    
-    if ($latestPipVersion -and $currentPipVersion -eq $latestPipVersion) {
+    $latestPipOutput = python -m pip index versions pip 2>&1 | Out-String
+    if ($latestPipOutput -match 'LATEST:\s*(\S+)') {
+        $latestPipVersion = $matches[1].Trim()
+    } else {
+        $latestPipVersion = ""
+    }
+
+    if ($latestPipVersion -and $currentPipVersion -and $currentPipVersion -eq $latestPipVersion) {
         Write-Host "   - ✓ pip 已是最新版本 ($currentPipVersion)" -ForegroundColor Green
     } else {
         Write-Host "   - 正在升級 pip..." -ForegroundColor Gray
@@ -305,24 +319,46 @@ try {
 
     # 檢查 setuptools 和 wheel 版本
     Write-Host "   - 正在檢查 setuptools 和 wheel..." -ForegroundColor Gray
-    
+
     $needsUpgrade = $false
     $toUpgrade = @()
-    
+
     # 檢查 setuptools
-    $currentSetuptools = (pip show setuptools 2>&1 | Select-String -Pattern "^Version:" | ForEach-Object { $_ -replace '^Version:\s*', '' })
-    $latestSetuptools = (python -m pip index versions setuptools 2>&1 | Select-String -Pattern "LATEST:" | ForEach-Object { $_ -replace '^.*LATEST:\s*', '' })
-    
-    if ($latestSetuptools -and $currentSetuptools -ne $latestSetuptools) {
+    $setupToolsOutput = pip show setuptools 2>&1 | Out-String
+    if ($setupToolsOutput -match 'Version:\s*(\S+)') {
+        $currentSetuptools = $matches[1].Trim()
+    } else {
+        $currentSetuptools = ""
+    }
+
+    $latestSetuptoolsOutput = python -m pip index versions setuptools 2>&1 | Out-String
+    if ($latestSetuptoolsOutput -match 'LATEST:\s*(\S+)') {
+        $latestSetuptools = $matches[1].Trim()
+    } else {
+        $latestSetuptools = ""
+    }
+
+    if ($latestSetuptools -and $currentSetuptools -and $currentSetuptools -ne $latestSetuptools) {
         $needsUpgrade = $true
         $toUpgrade += "setuptools ($currentSetuptools -> $latestSetuptools)"
     }
-    
+
     # 檢查 wheel
-    $currentWheel = (pip show wheel 2>&1 | Select-String -Pattern "^Version:" | ForEach-Object { $_ -replace '^Version:\s*', '' })
-    $latestWheel = (python -m pip index versions wheel 2>&1 | Select-String -Pattern "LATEST:" | ForEach-Object { $_ -replace '^.*LATEST:\s*', '' })
-    
-    if ($latestWheel -and $currentWheel -ne $latestWheel) {
+    $wheelOutput = pip show wheel 2>&1 | Out-String
+    if ($wheelOutput -match 'Version:\s*(\S+)') {
+        $currentWheel = $matches[1].Trim()
+    } else {
+        $currentWheel = ""
+    }
+
+    $latestWheelOutput = python -m pip index versions wheel 2>&1 | Out-String
+    if ($latestWheelOutput -match 'LATEST:\s*(\S+)') {
+        $latestWheel = $matches[1].Trim()
+    } else {
+        $latestWheel = ""
+    }
+
+    if ($latestWheel -and $currentWheel -and $currentWheel -ne $latestWheel) {
         $needsUpgrade = $true
         $toUpgrade += "wheel ($currentWheel -> $latestWheel)"
     }
@@ -331,14 +367,18 @@ try {
         Write-Host "   - 可升級：$($toUpgrade -join ', ')" -ForegroundColor Yellow
         Write-Host "   - 正在升級 setuptools 和 wheel..." -ForegroundColor Gray
         pip install --upgrade setuptools wheel 2>&1 | Out-Null
-        
+
         if ($LASTEXITCODE -eq 0) {
             Write-Host "   - ✓ setuptools 和 wheel 升級成功" -ForegroundColor Green
         } else {
             Write-Host "   - ⚠️ setuptools/wheel 升級失敗，但不影響基本使用" -ForegroundColor Yellow
         }
     } else {
-        Write-Host "   - ✓ setuptools ($currentSetuptools) 和 wheel ($currentWheel) 已是最新版本" -ForegroundColor Green
+        if ($currentSetuptools -and $currentWheel) {
+            Write-Host "   - ✓ setuptools ($currentSetuptools) 和 wheel ($currentWheel) 已是最新版本" -ForegroundColor Green
+        } else {
+            Write-Host "   - ✓ setuptools 和 wheel 已安裝" -ForegroundColor Green
+        }
     }
 } catch {
     Write-Host "⚠️  核心工具升級時發生錯誤，但不影響 Python 使用" -ForegroundColor Yellow

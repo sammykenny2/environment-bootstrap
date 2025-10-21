@@ -101,8 +101,8 @@ $npmVersion = (npm -v).Trim()
 Write-Host "   - Node.js: $nodeVersion" -ForegroundColor Green
 Write-Host "   - npm: $npmVersion" -ForegroundColor Green
 
-# 步驟 2: 安裝 global packages
-Write-Host "`n2. 正在安裝 global packages..." -ForegroundColor Yellow
+# 步驟 2: 處理 global packages
+Write-Host "`n2. 正在處理 global packages..." -ForegroundColor Yellow
 
 # 定義要安裝的 packages
 $packages = @(
@@ -114,19 +114,21 @@ $packages = @(
 )
 
 if ($packages.Count -eq 0) {
-    Write-Host "   - packages 列表為空，跳過安裝" -ForegroundColor Cyan
+    Write-Host "   - packages 列表為空，跳過處理" -ForegroundColor Cyan
     Write-Host "   - 如需安裝 packages，請編輯此腳本的 `$packages 數組" -ForegroundColor Gray
 } else {
-    Write-Host "   - 將安裝 $($packages.Count) 個 packages" -ForegroundColor Cyan
+    Write-Host "   - 檢查 $($packages.Count) 個 packages" -ForegroundColor Cyan
     Write-Host ""
 
     foreach ($package in $packages) {
-        Write-Host "   安裝 $package..." -ForegroundColor Gray
+        Write-Host "   檢查 $package..." -ForegroundColor Gray
 
         if ($Force) {
             npm install -g $package --force | Out-Null
+            $action = "重新安裝"
         } elseif ($Upgrade) {
             npm install -g $package@latest | Out-Null
+            $action = "升級"
         } else {
             # 檢查是否已安裝
             $installed = npm list -g $package --depth=0 2>$null
@@ -135,12 +137,13 @@ if ($packages.Count -eq 0) {
                 continue
             }
             npm install -g $package | Out-Null
+            $action = "安裝"
         }
 
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "      ✓ $package 完成" -ForegroundColor Green
+            Write-Host "      ✓ $action 完成" -ForegroundColor Green
         } else {
-            Write-Host "      ✗ $package 失敗" -ForegroundColor Red
+            Write-Host "      ✗ $action 失敗" -ForegroundColor Red
             exit 1
         }
     }

@@ -95,8 +95,8 @@ $pipVersion = pip --version 2>&1
 Write-Host "   - Python: $pythonVersion" -ForegroundColor Green
 Write-Host "   - pip: $pipVersion" -ForegroundColor Green
 
-# 步驟 2: 安裝 Python development packages
-Write-Host "`n2. 正在安裝 Python development packages..." -ForegroundColor Yellow
+# 步驟 2: 處理 Python development packages
+Write-Host "`n2. 正在處理 Python development packages..." -ForegroundColor Yellow
 
 # 定義要安裝的 packages (目前為空，用戶可自行添加)
 $packages = @(
@@ -116,27 +116,30 @@ $packages = @(
 )
 
 if ($packages.Count -eq 0) {
-    Write-Host "   - packages 列表為空，跳過安裝" -ForegroundColor Cyan
+    Write-Host "   - packages 列表為空，跳過處理" -ForegroundColor Cyan
     Write-Host "   - 如需安裝 packages，請編輯此腳本的 `$packages 數組" -ForegroundColor Gray
 } else {
-    Write-Host "   - 將安裝 $($packages.Count) 個 packages" -ForegroundColor Cyan
+    Write-Host "   - 檢查 $($packages.Count) 個 packages" -ForegroundColor Cyan
     Write-Host ""
 
     foreach ($package in $packages) {
-        Write-Host "   安裝 $package..." -ForegroundColor Gray
+        Write-Host "   檢查 $package..." -ForegroundColor Gray
 
         if ($Force) {
             pip install --force-reinstall $package 2>&1 | Out-Null
+            $action = "重新安裝"
         } elseif ($Upgrade) {
             pip install --upgrade $package 2>&1 | Out-Null
+            $action = "升級"
         } else {
             pip install $package 2>&1 | Out-Null
+            $action = "處理"
         }
 
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "      ✓ $package 完成" -ForegroundColor Green
+            Write-Host "      ✓ $action 完成" -ForegroundColor Green
         } else {
-            Write-Host "      ✗ $package 失敗" -ForegroundColor Red
+            Write-Host "      ✗ $action 失敗" -ForegroundColor Red
             exit 1
         }
     }

@@ -127,13 +127,24 @@ if ($useWinget) {
             Write-Host "   - 正在安裝 Git..." -ForegroundColor Gray
         }
 
-        Invoke-Expression $command
+        $output = Invoke-Expression $command 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
 
-        if ($LASTEXITCODE -eq 0) {
+        # Winget exit codes:
+        # 0 = Success
+        # -1978335189 (0x8A15002B) = No applicable update found (already latest)
+        # Other negative values = Various errors
+
+        if ($exitCode -eq 0) {
             Write-Host "   - Git 安裝成功！" -ForegroundColor Green
             $installSuccess = $true
+        } elseif (($Upgrade -and $gitExists) -and ($exitCode -eq -1978335189)) {
+            # This specific exit code means "no applicable upgrade found"
+            Write-Host "   - Git 已是最新版本！" -ForegroundColor Green
+            $installSuccess = $true
         } else {
-            Write-Host "⚠️  winget 安裝失敗，將嘗試 fallback 方法" -ForegroundColor Yellow
+            Write-Host "⚠️  winget 安裝失敗 (exit code: $exitCode)" -ForegroundColor Yellow
+            Write-Host "⚠️  將嘗試 fallback 方法" -ForegroundColor Yellow
             $installSuccess = $false
         }
     } catch {
@@ -171,8 +182,15 @@ if (-not $installSuccess) {
 
         $installerPath = "$env:TEMP\GitInstaller.exe"
 
+        # 下載安裝器 (with progress)
         Write-Host "   - 正在下載 Git 安裝器..." -ForegroundColor Gray
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+        $ProgressPreference = 'Continue'  # Show download progress
+        try {
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+            Write-Host "   - 下載完成！" -ForegroundColor Green
+        } finally {
+            $ProgressPreference = 'SilentlyContinue'  # Restore default
+        }
 
         Write-Host "   - 正在執行安裝..." -ForegroundColor Gray
         Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS" -Wait
