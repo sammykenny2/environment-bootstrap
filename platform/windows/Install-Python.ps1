@@ -100,49 +100,89 @@ if (-not $pyenvExists -or $Force -or $Upgrade) {
         [System.Environment]::SetEnvironmentVariable('Path', $NewPath, 'User')
     }
 
-    # 下載並安裝
-    $PyEnvDir = "$env:USERPROFILE\.pyenv"
-    $ZipFile = "$env:TEMP\pyenv-win.zip"
+    $installSuccess = $false
 
+    # 方法 A: 使用官方安裝腳本 (Primary)
     try {
-        Write-Host "   - 正在下載 pyenv-win..." -ForegroundColor Gray
+        Write-Host "   - 正在使用官方安裝腳本..." -ForegroundColor Gray
+
+        $installerPath = "$env:TEMP\install-pyenv-win.ps1"
+
+        # 下載官方安裝腳本
         Invoke-WebRequest -UseBasicParsing `
-            -Uri "https://github.com/pyenv-win/pyenv-win/archive/master.zip" `
-            -OutFile $ZipFile
+            -Uri "https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1" `
+            -OutFile $installerPath
 
-        Write-Host "   - 正在解壓縮..." -ForegroundColor Gray
-        New-Item -Path $PyEnvDir -ItemType Directory -Force | Out-Null
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($ZipFile, $PyEnvDir)
+        # 執行安裝腳本
+        & $installerPath
 
-        Write-Host "   - 正在整理檔案..." -ForegroundColor Gray
-        Move-Item -Path "$PyEnvDir\pyenv-win-master\*" -Destination "$PyEnvDir" -Force
-        Remove-Item -Path "$PyEnvDir\pyenv-win-master" -Recurse -Force
-        Remove-Item -Path $ZipFile -Force
+        # 刪除安裝腳本
+        Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
 
-        # 設定環境變數
-        Write-Host "   - 正在設定環境變數..." -ForegroundColor Gray
-        [System.Environment]::SetEnvironmentVariable('PYENV', "$PyEnvDir\pyenv-win\", 'User')
-        [System.Environment]::SetEnvironmentVariable('PYENV_ROOT', "$PyEnvDir\pyenv-win\", 'User')
-        [System.Environment]::SetEnvironmentVariable('PYENV_HOME', "$PyEnvDir\pyenv-win\", 'User')
+        # 刷新環境變數確認安裝
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
 
-        # 加入 PATH
-        $UserPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
-        $PyEnvBin = "$PyEnvDir\pyenv-win\bin"
-        $PyEnvShims = "$PyEnvDir\pyenv-win\shims"
-
-        if ($UserPath -notlike "*$PyEnvBin*") {
-            [System.Environment]::SetEnvironmentVariable('Path', "$PyEnvBin;$PyEnvShims;$UserPath", 'User')
+        $pyenvCheck = Get-Command pyenv -ErrorAction SilentlyContinue
+        if ($pyenvCheck) {
+            Write-Host "   - pyenv-win 安裝成功！" -ForegroundColor Green
+            $installSuccess = $true
+        } else {
+            throw "官方安裝腳本執行後未找到 pyenv 命令"
         }
 
-        # 刷新當前 session 的環境變數
-        $env:Path = "$PyEnvBin;$PyEnvShims;" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-
-        Write-Host "   - pyenv-win 安裝成功！" -ForegroundColor Green
-
     } catch {
-        Write-Host "❌ pyenv-win 安裝失敗：$($_.Exception.Message)" -ForegroundColor Red
-        exit 1
+        Write-Host "⚠️  官方安裝腳本失敗：$($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "   - 將嘗試 fallback 方法" -ForegroundColor Yellow
+        $installSuccess = $false
+    }
+
+    # 方法 B: 手動安裝 (Fallback)
+    if (-not $installSuccess) {
+        Write-Host "   - 正在使用手動安裝方法..." -ForegroundColor Gray
+
+        $PyEnvDir = "$env:USERPROFILE\.pyenv"
+        $ZipFile = "$env:TEMP\pyenv-win.zip"
+
+        try {
+            Write-Host "   - 正在下載 pyenv-win..." -ForegroundColor Gray
+            Invoke-WebRequest -UseBasicParsing `
+                -Uri "https://github.com/pyenv-win/pyenv-win/archive/master.zip" `
+                -OutFile $ZipFile
+
+            Write-Host "   - 正在解壓縮..." -ForegroundColor Gray
+            New-Item -Path $PyEnvDir -ItemType Directory -Force | Out-Null
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($ZipFile, $PyEnvDir)
+
+            Write-Host "   - 正在整理檔案..." -ForegroundColor Gray
+            Move-Item -Path "$PyEnvDir\pyenv-win-master\*" -Destination "$PyEnvDir" -Force
+            Remove-Item -Path "$PyEnvDir\pyenv-win-master" -Recurse -Force
+            Remove-Item -Path $ZipFile -Force
+
+            # 設定環境變數
+            Write-Host "   - 正在設定環境變數..." -ForegroundColor Gray
+            [System.Environment]::SetEnvironmentVariable('PYENV', "$PyEnvDir\pyenv-win\", 'User')
+            [System.Environment]::SetEnvironmentVariable('PYENV_ROOT', "$PyEnvDir\pyenv-win\", 'User')
+            [System.Environment]::SetEnvironmentVariable('PYENV_HOME', "$PyEnvDir\pyenv-win\", 'User')
+
+            # 加入 PATH
+            $UserPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+            $PyEnvBin = "$PyEnvDir\pyenv-win\bin"
+            $PyEnvShims = "$PyEnvDir\pyenv-win\shims"
+
+            if ($UserPath -notlike "*$PyEnvBin*") {
+                [System.Environment]::SetEnvironmentVariable('Path', "$PyEnvBin;$PyEnvShims;$UserPath", 'User')
+            }
+
+            # 刷新當前 session 的環境變數
+            $env:Path = "$PyEnvBin;$PyEnvShims;" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+
+            Write-Host "   - pyenv-win 安裝成功！" -ForegroundColor Green
+
+        } catch {
+            Write-Host "❌ pyenv-win 安裝失敗：$($_.Exception.Message)" -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
