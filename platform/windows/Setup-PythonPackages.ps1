@@ -1,28 +1,22 @@
 <#
 .SYNOPSIS
-    Setup Python environment and packages
+    Install Python development packages
 
 .DESCRIPTION
-    Installs Python via pyenv-win and sets up commonly used packages.
+    Installs Python development packages using pip.
+    Requires Setup-Python.ps1 to be run first.
     All operations in user directory (no admin required).
     Rejects execution with admin privileges to avoid permission issues.
-
-.PARAMETER PythonVersion
-    Python version to install (default: 3.11.0)
 
 .PARAMETER Upgrade
     Upgrade existing packages to latest versions
 
 .PARAMETER Force
-    Force reinstall Python and all packages
+    Force reinstall all packages
 
 .EXAMPLE
     .\Setup-PythonPackages.ps1
-    Default: Install Python 3.11.0 if missing, install packages
-
-.EXAMPLE
-    .\Setup-PythonPackages.ps1 -PythonVersion "3.12.0"
-    Install specific Python version
+    Default: Install packages if missing
 
 .EXAMPLE
     .\Setup-PythonPackages.ps1 -Upgrade
@@ -30,13 +24,10 @@
 
 .EXAMPLE
     .\Setup-PythonPackages.ps1 -Force
-    Force reinstall Python and all packages
+    Force reinstall all packages
 #>
 
 param(
-    [Parameter(Mandatory=$false)]
-    [string]$PythonVersion = "3.11.0",
-
     [Parameter(Mandatory=$false)]
     [switch]$Upgrade,
 
@@ -57,7 +48,7 @@ if ($isAdmin) {
 }
 
 # --- 腳本開始 ---
-Write-Host "--- Python Environment Setup ---" -ForegroundColor Cyan
+Write-Host "--- Python Development Packages 安裝腳本 ---" -ForegroundColor Cyan
 
 # 處理互斥參數
 if ($Force -and $Upgrade) {
@@ -65,119 +56,87 @@ if ($Force -and $Upgrade) {
     $Upgrade = $false
 }
 
-# 步驟 1: 檢查 pyenv-win 是否已安裝
-Write-Host "`n1. 正在檢查 pyenv-win..." -ForegroundColor Yellow
-$pyenvExists = Get-Command pyenv -ErrorAction SilentlyContinue
+# 步驟 1: 檢查 Python 是否已安裝
+Write-Host "`n1. 正在檢查 Python 環境..." -ForegroundColor Yellow
 
-if (-not $pyenvExists) {
-    Write-Host "❌ 錯誤：未找到 pyenv-win" -ForegroundColor Red
-    Write-Host "請先執行 Quick-Install.ps1 安裝 pyenv-win" -ForegroundColor Yellow
+# 刷新環境變數以確保 python 可用
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+
+$pythonExists = Get-Command python -ErrorAction SilentlyContinue
+
+if (-not $pythonExists) {
+    Write-Host "❌ 錯誤：未找到 Python" -ForegroundColor Red
+    Write-Host "請先執行 Setup-Python.ps1 安裝 Python 核心環境" -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "   - pyenv-win 已安裝" -ForegroundColor Green
+$pythonVersion = python --version 2>&1
+$pipVersion = pip --version 2>&1
+Write-Host "   - Python: $pythonVersion" -ForegroundColor Green
+Write-Host "   - pip: $pipVersion" -ForegroundColor Green
 
-# 步驟 2: 安裝 Python
-Write-Host "`n2. 正在檢查 Python $PythonVersion..." -ForegroundColor Yellow
+# 步驟 2: 安裝 Python development packages
+Write-Host "`n2. 正在安裝 Python development packages..." -ForegroundColor Yellow
 
-# 刷新環境變數以確保 pyenv 可用
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-
-# 檢查是否已安裝指定版本
-$installedVersions = pyenv versions 2>$null
-$pythonInstalled = $installedVersions -match $PythonVersion
-
-if ($pythonInstalled -and -not $Force) {
-    Write-Host "   - Python $PythonVersion 已安裝" -ForegroundColor Green
-} else {
-    if ($Force) {
-        Write-Host "   - 使用 -Force 參數，重新安裝 Python $PythonVersion" -ForegroundColor Yellow
-    } else {
-        Write-Host "   - Python $PythonVersion 未安裝，開始安裝..." -ForegroundColor Yellow
-    }
-
-    pyenv install $PythonVersion
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Python 安裝失敗" -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host "   - Python $PythonVersion 安裝完成" -ForegroundColor Green
-}
-
-# 步驟 3: 設定 global Python version
-Write-Host "`n3. 正在設定 global Python version..." -ForegroundColor Yellow
-pyenv global $PythonVersion
-
-if ($LASTEXITCODE -eq 0) {
-    $currentVersion = python --version 2>&1
-    Write-Host "   - 當前 Python: $currentVersion" -ForegroundColor Green
-} else {
-    Write-Host "❌ 設定 global version 失敗" -ForegroundColor Red
-    exit 1
-}
-
-# 步驟 4: 升級 pip
-Write-Host "`n4. 正在升級 pip..." -ForegroundColor Yellow
-python -m pip install --upgrade pip | Out-Null
-
-if ($LASTEXITCODE -eq 0) {
-    $pipVersion = pip --version
-    Write-Host "   - $pipVersion" -ForegroundColor Green
-} else {
-    Write-Host "⚠️  pip 升級失敗，繼續安裝 packages..." -ForegroundColor Yellow
-}
-
-# 步驟 5: 安裝 Python packages
-Write-Host "`n5. 正在安裝 Python packages..." -ForegroundColor Yellow
-
-# 定義要安裝的 packages
+# 定義要安裝的 packages (目前為空，用戶可自行添加)
 $packages = @(
-    "pipenv",
-    "poetry",
-    "black",
-    "pylint",
-    "flake8",
-    "pytest",
-    "pytest-cov",
-    "ipython",
-    "jupyter",
-    "requests",
-    "pandas",
-    "numpy"
+    # 範例 (已註解)：
+    # "pipenv",
+    # "poetry",
+    # "black",
+    # "pylint",
+    # "flake8",
+    # "pytest",
+    # "pytest-cov",
+    # "ipython",
+    # "jupyter",
+    # "requests",
+    # "pandas",
+    # "numpy"
 )
 
-Write-Host "   - 將安裝 $($packages.Count) 個 packages" -ForegroundColor Cyan
-Write-Host ""
+if ($packages.Count -eq 0) {
+    Write-Host "   - packages 列表為空，跳過安裝" -ForegroundColor Cyan
+    Write-Host "   - 如需安裝 packages，請編輯此腳本的 `$packages 數組" -ForegroundColor Gray
+} else {
+    Write-Host "   - 將安裝 $($packages.Count) 個 packages" -ForegroundColor Cyan
+    Write-Host ""
 
-foreach ($package in $packages) {
-    Write-Host "   安裝 $package..." -ForegroundColor Gray
+    foreach ($package in $packages) {
+        Write-Host "   安裝 $package..." -ForegroundColor Gray
 
-    if ($Force) {
-        pip install --force-reinstall $package | Out-Null
-    } elseif ($Upgrade) {
-        pip install --upgrade $package | Out-Null
-    } else {
-        pip install $package | Out-Null
-    }
+        if ($Force) {
+            pip install --force-reinstall $package 2>&1 | Out-Null
+        } elseif ($Upgrade) {
+            pip install --upgrade $package 2>&1 | Out-Null
+        } else {
+            pip install $package 2>&1 | Out-Null
+        }
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "      ✓ $package 完成" -ForegroundColor Green
-    } else {
-        Write-Host "      ✗ $package 失敗" -ForegroundColor Red
-        exit 1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "      ✓ $package 完成" -ForegroundColor Green
+        } else {
+            Write-Host "      ✗ $package 失敗" -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
 # --- 完成 ---
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Python Environment Setup 完成！"
-Write-Host "Python Version: $PythonVersion"
+Write-Host "Python Development Packages 安裝完成！"
 Write-Host "========================================"
 Write-Host ""
-Write-Host "已安裝的 packages：" -ForegroundColor Cyan
-pip list
-Write-Host ""
+
+if ($packages.Count -gt 0) {
+    Write-Host "已安裝的 packages：" -ForegroundColor Cyan
+    pip list
+    Write-Host ""
+} else {
+    Write-Host "提示：目前沒有安裝任何 development packages" -ForegroundColor Cyan
+    Write-Host "如需安裝，請編輯此腳本的 `$packages 數組" -ForegroundColor Cyan
+    Write-Host ""
+}
+
 exit 0

@@ -185,6 +185,36 @@ if ($Upgrade -and $nodeExists) {
     }
 }
 
+# 步驟 6: 升級 npm 到最新版本
+Write-Host "`n6. 正在升級 npm..." -ForegroundColor Yellow
+
+# 刷新環境變數以確保 npm 可用
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+# 檢查 npm 是否可用
+$npmExists = Get-Command npm -ErrorAction SilentlyContinue
+if ($npmExists) {
+    $currentNpmVersion = (npm -v).Trim()
+    Write-Host "   - 當前 npm 版本：$currentNpmVersion" -ForegroundColor Cyan
+
+    try {
+        Write-Host "   - 正在升級 npm 到最新版本..." -ForegroundColor Gray
+        npm install -g npm@latest 2>&1 | Out-Null
+
+        if ($LASTEXITCODE -eq 0) {
+            $newNpmVersion = (npm -v).Trim()
+            Write-Host "   - npm 升級成功！新版本：$newNpmVersion" -ForegroundColor Green
+        } else {
+            Write-Host "⚠️  npm 升級失敗，但不影響 Node.js 使用" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "⚠️  npm 升級時發生錯誤：$($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "   - 但不影響 Node.js 使用" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "⚠️  無法找到 npm，可能需要重新開啟 PowerShell 視窗" -ForegroundColor Yellow
+}
+
 # --- 完成 ---
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "Node.js 操作完成！"

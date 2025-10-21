@@ -1,32 +1,39 @@
 <#
 .SYNOPSIS
-    Setup pyenv-win for Python version management
+    Setup Python core environment with pyenv-win
 
 .DESCRIPTION
-    Installs pyenv-win to user directory (no admin required).
-    Supports upgrade and force reinstall modes.
+    Installs pyenv-win, Python, and essential build tools (pip, setuptools, wheel).
+    All operations in user directory (no admin required).
     Rejects execution with admin privileges to avoid permission issues.
+
+.PARAMETER PythonVersion
+    Python version to install (e.g., "3.11.0").
+    If not specified, automatically detects and installs latest stable version.
 
 .PARAMETER Upgrade
     Upgrade existing installation to latest version
 
 .PARAMETER Force
-    Force reinstall even if already installed
+    Force reinstall pyenv-win and Python
 
 .EXAMPLE
     .\Setup-Python.ps1
-    Default: Install if missing, skip if already installed
+    Default: Install pyenv-win and latest stable Python
+
+.EXAMPLE
+    .\Setup-Python.ps1 -PythonVersion "3.12.0"
+    Install specific Python version
 
 .EXAMPLE
     .\Setup-Python.ps1 -Upgrade
-    Upgrade to latest version
-
-.EXAMPLE
-    .\Setup-Python.ps1 -Force
-    Force reinstall pyenv-win
+    Upgrade to latest stable Python version
 #>
 
 param(
+    [Parameter(Mandatory=$false)]
+    [string]$PythonVersion = "",  # Empty = auto-detect latest stable
+
     [Parameter(Mandatory=$false)]
     [switch]$Upgrade,
 
@@ -40,20 +47,22 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if ($isAdmin) {
     Write-Host "❌ 錯誤：此腳本不應以管理員權限執行" -ForegroundColor Red
     Write-Host ""
-    Write-Host "原因：pyenv-win 應安裝在用戶目錄，避免權限問題" -ForegroundColor Yellow
+    Write-Host "原因：Python 應安裝在用戶目錄，避免權限問題" -ForegroundColor Yellow
     Write-Host "母腳本應以一般權限執行，子腳本會在需要時自動提權" -ForegroundColor Yellow
     Write-Host ""
     exit 1
 }
 
 # --- 腳本開始 ---
-Write-Host "--- PyEnv-Win 環境安裝腳本 ---" -ForegroundColor Cyan
+Write-Host "--- Python 核心環境安裝腳本 ---" -ForegroundColor Cyan
 
 # 處理互斥參數
 if ($Force -and $Upgrade) {
     Write-Host "⚠️  警告：不能同時使用 -Force 和 -Upgrade，將使用 -Force" -ForegroundColor Yellow
     $Upgrade = $false
 }
+
+# ========== 第一部分：安裝/升級 pyenv-win ==========
 
 # 步驟 1: 檢查 pyenv-win 是否已安裝
 Write-Host "`n1. 正在檢查 pyenv-win 是否已安裝..." -ForegroundColor Yellow
@@ -64,98 +73,186 @@ if ($pyenvExists) {
 
     # 根據參數決定行為
     if ($Force) {
-        Write-Host "   - 使用 -Force 參數，將強制重新安裝。" -ForegroundColor Yellow
+        Write-Host "   - 使用 -Force 參數，將強制重新安裝 pyenv-win。" -ForegroundColor Yellow
     } elseif ($Upgrade) {
-        Write-Host "   - 使用 -Upgrade 參數，將升級到最新版本。" -ForegroundColor Yellow
+        Write-Host "   - 使用 -Upgrade 參數，將升級 pyenv-win 到最新版本。" -ForegroundColor Yellow
     } else {
-        Write-Host "   - 無需重複安裝。如需升級請使用 -Upgrade 參數。" -ForegroundColor Cyan
-        exit 0
+        Write-Host "   - pyenv-win 已安裝，跳過。" -ForegroundColor Cyan
     }
 } else {
     Write-Host "   - 系統中未找到 pyenv-win，準備開始安裝。"
 }
 
-# 步驟 2: 清理舊版本 (如果是 Force 或 Upgrade)
-if ($Force -or $Upgrade -or -not $pyenvExists) {
-    Write-Host "`n2. 正在清理舊版本..." -ForegroundColor Yellow
+# 步驟 2: 安裝/升級 pyenv-win (如果需要)
+if (-not $pyenvExists -or $Force -or $Upgrade) {
+    Write-Host "`n2. 正在安裝/升級 pyenv-win..." -ForegroundColor Yellow
 
-Remove-Item -Path "$env:USERPROFILE\.pyenv" -Recurse -Force -ErrorAction SilentlyContinue
-[System.Environment]::SetEnvironmentVariable('PYENV', $null, 'User')
-[System.Environment]::SetEnvironmentVariable('PYENV_HOME', $null, 'User')
-[System.Environment]::SetEnvironmentVariable('PYENV_ROOT', $null, 'User')
+    # 清理舊版本
+    Write-Host "   - 正在清理舊版本..." -ForegroundColor Gray
+    Remove-Item -Path "$env:USERPROFILE\.pyenv" -Recurse -Force -ErrorAction SilentlyContinue
+    [System.Environment]::SetEnvironmentVariable('PYENV', $null, 'User')
+    [System.Environment]::SetEnvironmentVariable('PYENV_HOME', $null, 'User')
+    [System.Environment]::SetEnvironmentVariable('PYENV_ROOT', $null, 'User')
 
-$UserPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
-if ($UserPath) {
-    $NewPath = ($UserPath -split ';' | Where-Object { $_ -notlike "*pyenv*" }) -join ';'
-    [System.Environment]::SetEnvironmentVariable('Path', $NewPath, 'User')
-}
-
-    Write-Host "   - 清理完成。" -ForegroundColor Green
-}
-
-# 步驟 3: 載入 Archive 模塊
-Write-Host "`n3. 正在載入 Archive 模塊..." -ForegroundColor Yellow
-
-try {
-    Import-Module Microsoft.PowerShell.Archive -Force -ErrorAction Stop
-    Write-Host "   - Archive 模塊已載入。" -ForegroundColor Green
-} catch {
-    Write-Host "   - Archive 模塊載入失敗，將使用手動解壓縮。" -ForegroundColor Yellow
-}
-
-# 步驟 4: 安裝 pyenv-win
-Write-Host "`n4. 正在安裝 pyenv-win..." -ForegroundColor Yellow
-
-$PyEnvDir = "$env:USERPROFILE\.pyenv"
-$ZipFile = "$env:TEMP\pyenv-win.zip"
-
-try {
-    # 下載壓縮檔
-    Write-Host "   - 正在下載..." -ForegroundColor Gray
-    Invoke-WebRequest -UseBasicParsing `
-        -Uri "https://github.com/pyenv-win/pyenv-win/archive/master.zip" `
-        -OutFile $ZipFile
-
-    # 建立目錄
-    New-Item -Path $PyEnvDir -ItemType Directory -Force | Out-Null
-
-    # 解壓縮（使用 .NET 作為備援方案）
-    Write-Host "   - 正在解壓縮..." -ForegroundColor Gray
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($ZipFile, $PyEnvDir)
-
-    # 整理檔案結構
-    Write-Host "   - 正在整理檔案..." -ForegroundColor Gray
-    Move-Item -Path "$PyEnvDir\pyenv-win-master\*" -Destination "$PyEnvDir" -Force
-    Remove-Item -Path "$PyEnvDir\pyenv-win-master" -Recurse -Force
-    Remove-Item -Path $ZipFile -Force
-
-    # 設定環境變數
-    Write-Host "   - 正在設定環境變數..." -ForegroundColor Gray
-    [System.Environment]::SetEnvironmentVariable('PYENV', "$PyEnvDir\pyenv-win\", 'User')
-    [System.Environment]::SetEnvironmentVariable('PYENV_ROOT', "$PyEnvDir\pyenv-win\", 'User')
-    [System.Environment]::SetEnvironmentVariable('PYENV_HOME', "$PyEnvDir\pyenv-win\", 'User')
-
-    # 加入 PATH
     $UserPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
-    $PyEnvBin = "$PyEnvDir\pyenv-win\bin"
-    $PyEnvShims = "$PyEnvDir\pyenv-win\shims"
-
-    if ($UserPath -notlike "*$PyEnvBin*") {
-        [System.Environment]::SetEnvironmentVariable('Path', "$PyEnvBin;$PyEnvShims;$UserPath", 'User')
+    if ($UserPath) {
+        $NewPath = ($UserPath -split ';' | Where-Object { $_ -notlike "*pyenv*" }) -join ';'
+        [System.Environment]::SetEnvironmentVariable('Path', $NewPath, 'User')
     }
 
-    Write-Host "   - 安裝成功！" -ForegroundColor Green
+    # 下載並安裝
+    $PyEnvDir = "$env:USERPROFILE\.pyenv"
+    $ZipFile = "$env:TEMP\pyenv-win.zip"
 
-} catch {
-    Write-Host "   - 安裝失敗：$_" -ForegroundColor Red
-    Read-Host "按 Enter 鍵結束..."
+    try {
+        Write-Host "   - 正在下載 pyenv-win..." -ForegroundColor Gray
+        Invoke-WebRequest -UseBasicParsing `
+            -Uri "https://github.com/pyenv-win/pyenv-win/archive/master.zip" `
+            -OutFile $ZipFile
+
+        Write-Host "   - 正在解壓縮..." -ForegroundColor Gray
+        New-Item -Path $PyEnvDir -ItemType Directory -Force | Out-Null
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($ZipFile, $PyEnvDir)
+
+        Write-Host "   - 正在整理檔案..." -ForegroundColor Gray
+        Move-Item -Path "$PyEnvDir\pyenv-win-master\*" -Destination "$PyEnvDir" -Force
+        Remove-Item -Path "$PyEnvDir\pyenv-win-master" -Recurse -Force
+        Remove-Item -Path $ZipFile -Force
+
+        # 設定環境變數
+        Write-Host "   - 正在設定環境變數..." -ForegroundColor Gray
+        [System.Environment]::SetEnvironmentVariable('PYENV', "$PyEnvDir\pyenv-win\", 'User')
+        [System.Environment]::SetEnvironmentVariable('PYENV_ROOT', "$PyEnvDir\pyenv-win\", 'User')
+        [System.Environment]::SetEnvironmentVariable('PYENV_HOME', "$PyEnvDir\pyenv-win\", 'User')
+
+        # 加入 PATH
+        $UserPath = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+        $PyEnvBin = "$PyEnvDir\pyenv-win\bin"
+        $PyEnvShims = "$PyEnvDir\pyenv-win\shims"
+
+        if ($UserPath -notlike "*$PyEnvBin*") {
+            [System.Environment]::SetEnvironmentVariable('Path', "$PyEnvBin;$PyEnvShims;$UserPath", 'User')
+        }
+
+        # 刷新當前 session 的環境變數
+        $env:Path = "$PyEnvBin;$PyEnvShims;" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+
+        Write-Host "   - pyenv-win 安裝成功！" -ForegroundColor Green
+
+    } catch {
+        Write-Host "❌ pyenv-win 安裝失敗：$($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# 刷新環境變數確保 pyenv 可用
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+
+# ========== 第二部分：安裝/升級 Python ==========
+
+# 步驟 3: 確定要安裝的 Python 版本
+Write-Host "`n3. 正在確定 Python 版本..." -ForegroundColor Yellow
+
+if ($PythonVersion -eq "") {
+    # 自動檢測最新穩定版
+    Write-Host "   - 未指定版本，正在檢測最新穩定版..." -ForegroundColor Gray
+
+    try {
+        $availableVersions = pyenv install --list 2>&1 | Select-String "^\s*3\.\d+\.\d+$" | ForEach-Object { $_.Line.Trim() }
+        if ($availableVersions) {
+            # 取最後一個（最新）
+            $PythonVersion = $availableVersions | Select-Object -Last 1
+            Write-Host "   - 檢測到最新穩定版：$PythonVersion" -ForegroundColor Cyan
+        } else {
+            Write-Host "⚠️  無法檢測最新版本，使用默認版本 3.11.0" -ForegroundColor Yellow
+            $PythonVersion = "3.11.0"
+        }
+    } catch {
+        Write-Host "⚠️  版本檢測失敗，使用默認版本 3.11.0" -ForegroundColor Yellow
+        $PythonVersion = "3.11.0"
+    }
+} else {
+    Write-Host "   - 指定版本：$PythonVersion" -ForegroundColor Cyan
+}
+
+# 步驟 4: 安裝 Python
+Write-Host "`n4. 正在檢查 Python $PythonVersion..." -ForegroundColor Yellow
+
+$installedVersions = pyenv versions 2>$null
+$pythonInstalled = $installedVersions -match $PythonVersion
+
+if ($pythonInstalled -and -not $Force) {
+    Write-Host "   - Python $PythonVersion 已安裝" -ForegroundColor Green
+} else {
+    if ($Force) {
+        Write-Host "   - 使用 -Force 參數，重新安裝 Python $PythonVersion" -ForegroundColor Yellow
+    } else {
+        Write-Host "   - Python $PythonVersion 未安裝，開始安裝..." -ForegroundColor Yellow
+    }
+
+    Write-Host "   - 這可能需要幾分鐘時間，請稍候..." -ForegroundColor Gray
+    pyenv install $PythonVersion
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Python 安裝失敗" -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "   - Python $PythonVersion 安裝完成" -ForegroundColor Green
+}
+
+# 步驟 5: 設定 global Python version
+Write-Host "`n5. 正在設定 global Python version..." -ForegroundColor Yellow
+pyenv global $PythonVersion
+
+if ($LASTEXITCODE -eq 0) {
+    # 刷新 PATH 確保 python 可用
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+
+    $currentVersion = python --version 2>&1
+    Write-Host "   - 當前 Python: $currentVersion" -ForegroundColor Green
+} else {
+    Write-Host "❌ 設定 global version 失敗" -ForegroundColor Red
     exit 1
 }
 
+# 步驟 6: 升級核心工具 (pip, setuptools, wheel)
+Write-Host "`n6. 正在升級核心工具..." -ForegroundColor Yellow
+
+try {
+    Write-Host "   - 正在升級 pip..." -ForegroundColor Gray
+    python -m pip install --upgrade pip 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -eq 0) {
+        $pipVersion = pip --version
+        Write-Host "   - ✓ $pipVersion" -ForegroundColor Green
+    } else {
+        Write-Host "   - ⚠️ pip 升級失敗" -ForegroundColor Yellow
+    }
+
+    Write-Host "   - 正在升級 setuptools 和 wheel..." -ForegroundColor Gray
+    pip install --upgrade setuptools wheel 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "   - ✓ setuptools 和 wheel 升級成功" -ForegroundColor Green
+    } else {
+        Write-Host "   - ⚠️ setuptools/wheel 升級失敗，但不影響基本使用" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "⚠️  核心工具升級時發生錯誤，但不影響 Python 使用" -ForegroundColor Yellow
+}
+
 # --- 完成 ---
-Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "PyEnv-Win 安裝成功！"
-Write-Host "請重新開啟 PowerShell 視窗，然後執行 'pyenv --version' 驗證安裝。"
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Python 核心環境安裝完成！"
+Write-Host "Python Version: $PythonVersion"
 Write-Host "========================================"
-Read-Host "按 Enter 鍵結束..."
+Write-Host ""
+Write-Host "已安裝：" -ForegroundColor Cyan
+Write-Host "  - pyenv-win (Python 版本管理)"
+Write-Host "  - Python $PythonVersion"
+Write-Host "  - pip, setuptools, wheel"
+Write-Host ""
+exit 0
