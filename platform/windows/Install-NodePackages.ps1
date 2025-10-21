@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Install Node.js global packages
 
