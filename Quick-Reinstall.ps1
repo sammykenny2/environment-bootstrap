@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Quick reinstall script for development environment
 
@@ -113,7 +113,7 @@ foreach ($scriptName in $adminScripts) {
     $toolName = $scriptName -replace '^Install-(.+)-Admin\.ps1$', '$1'
     Write-Info "Reinstalling $toolName (may require UAC)..."
 
-    & $scriptPath -Force
+    & $scriptPath -Force -NonInteractive
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
