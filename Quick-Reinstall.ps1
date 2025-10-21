@@ -56,36 +56,30 @@ Write-Step "Reinstalling Tools and Packages"
 
 $PlatformDir = Join-Path $ScriptDir "platform\windows"
 
-# Get all Install-* and Setup-* scripts, sorted alphabetically
-# This ensures Install-* scripts run before Setup-* scripts
-$allScripts = Get-ChildItem -Path $PlatformDir -Filter "*.ps1" -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -match '^(Install|Setup)-.*\.ps1$' } |
-    Sort-Object Name
+# Define Install-* execution order (dependencies matter)
+$installOrder = @(
+    "Install-Winget.ps1",       # Foundation: package manager for other tools
+    "Install-PowerShell.ps1",   # Optional: upgrade to PowerShell 7
+    "Install-NodeJS.ps1"        # Depends on winget
+)
 
-if (-not $allScripts) {
-    Write-Warning "No installation or setup scripts found in $PlatformDir"
-    exit 0
-}
-
-Write-Info "Found $($allScripts.Count) script(s) to reinstall"
+# Step 1: Execute Install-* scripts in specified order
+Write-Info "Phase 1: Reinstalling system tools (may require UAC)"
 Write-Host ""
 
-foreach ($script in $allScripts) {
-    # Determine script type and tool name
-    if ($script.Name -match '^Install-(.+)\.ps1$') {
-        $toolName = $Matches[1]
-        Write-Info "Reinstalling $toolName (may require UAC)..."
-    } elseif ($script.Name -match '^Setup-(.+)\.ps1$') {
-        $toolName = $Matches[1]
-        Write-Info "Reinstalling $toolName..."
-    } else {
+foreach ($scriptName in $installOrder) {
+    $scriptPath = Join-Path $PlatformDir $scriptName
+
+    if (-not (Test-Path $scriptPath)) {
+        Write-Warning "$scriptName not found, skipping..."
         continue
     }
 
-    # Execute script with -Force parameter
-    & $script.FullName -Force
+    $toolName = $scriptName -replace '^Install-(.+)\.ps1$', '$1'
+    Write-Info "Reinstalling $toolName (may require UAC)..."
 
-    # Check exit code
+    & $scriptPath -Force
+
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
         Write-Host "❌ $toolName reinstall failed with exit code $LASTEXITCODE" -ForegroundColor Red
@@ -97,6 +91,38 @@ foreach ($script in $allScripts) {
     }
 
     Write-Success "$toolName reinstall completed"
+    Write-Host ""
+}
+
+# Step 2: Execute Setup-* scripts (order doesn't matter, use alphabetical)
+Write-Info "Phase 2: Reinstalling development packages"
+Write-Host ""
+
+$setupScripts = Get-ChildItem -Path $PlatformDir -Filter "Setup-*.ps1" -ErrorAction SilentlyContinue |
+    Sort-Object Name
+
+if ($setupScripts) {
+    foreach ($script in $setupScripts) {
+        $toolName = $script.BaseName -replace '^Setup-', ''
+        Write-Info "Reinstalling $toolName..."
+
+        & $script.FullName -Force
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host ""
+            Write-Host "❌ $toolName reinstall failed with exit code $LASTEXITCODE" -ForegroundColor Red
+            Write-Host "Reinstall cannot continue" -ForegroundColor Red
+            Write-Host "Please check the error messages above and try again" -ForegroundColor Yellow
+            Write-Host ""
+            Read-Host "Press Enter to exit"
+            exit 1
+        }
+
+        Write-Success "$toolName reinstall completed"
+        Write-Host ""
+    }
+} else {
+    Write-Info "No Setup-* scripts found, skipping development packages reinstall"
     Write-Host ""
 }
 
