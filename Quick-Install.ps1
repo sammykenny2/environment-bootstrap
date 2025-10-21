@@ -179,6 +179,11 @@ if (Test-Path $CheckScript) {
     Write-Info "Skipping environment verification"
 }
 
+# Reload PATH for current session
+Write-Host ""
+Write-Info "Refreshing environment variables for current session..."
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+
 # Summary
 Write-Host ""
 Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Green
@@ -193,5 +198,7 @@ Write-Info "Next steps:"
 Write-Host "  1. Close this PowerShell window"
 Write-Host "  2. Open a NEW PowerShell window (to load updated PATH)"
 Write-Host "  3. Start developing!"
+Write-Host ""
+Write-Info "Note: PATH has been refreshed within this script for verification"
 Write-Host ""
 Write-Info "For help, see: README.md"
