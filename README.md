@@ -50,8 +50,8 @@ Double-click `Bootstrap.bat` to automatically:
 .\platform\windows\Install-NodePackages.ps1
 .\platform\windows\Install-PythonPackages.ps1
 
-# Check environment
-.\shared\windows\Check-Environment.ps1
+# Check installation
+.\platform\windows\Check-Installation.ps1
 ```
 
 ## Directory Structure
@@ -64,7 +64,8 @@ environment-bootstrap/
 ├── Quick-Upgrade.ps1      Upgrade all installed tools
 ├── Quick-Reinstall.ps1    Force reinstall everything
 │
-├── platform/windows/      Platform tools with admin privileges
+├── platform/windows/      Platform-specific tools and utilities
+│   ├── Check-Installation.ps1        - Verify installation status
 │   ├── Install-Winget-Admin.ps1      - Windows Package Manager
 │   ├── Install-Git-Admin.ps1         - Git for Windows
 │   ├── Install-PowerShell-Admin.ps1  - PowerShell 7
@@ -74,8 +75,7 @@ environment-bootstrap/
 │   ├── Install-NodePackages.ps1      - Global npm packages (no admin)
 │   └── Install-PythonPackages.ps1    - Python packages (no admin)
 │
-└── shared/windows/        Shared utilities
-    └── Check-Environment.ps1         - Verify installation
+└── shared/windows/        Reserved for future shared utilities
 ```
 
 ## Available Scripts
