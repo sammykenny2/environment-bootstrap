@@ -105,9 +105,14 @@ if (-not (Test-Path $npmGlobalPath)) {
     Write-Host "   - 建立目錄：$npmGlobalPath" -ForegroundColor Gray
 }
 
-# 設定 npm prefix
-npm config set prefix $npmGlobalPath
-Write-Host "   - npm prefix 設定為：$npmGlobalPath" -ForegroundColor Green
+# 檢查並設定 npm prefix
+$currentPrefix = (npm config get prefix 2>&1).Trim()
+if ($currentPrefix -ne $npmGlobalPath) {
+    npm config set prefix $npmGlobalPath
+    Write-Host "   - npm prefix 設定為：$npmGlobalPath" -ForegroundColor Green
+} else {
+    Write-Host "   - npm prefix 已正確配置：$npmGlobalPath" -ForegroundColor Cyan
+}
 
 # 步驟 3: 加入 PATH
 Write-Host "`n3. 正在更新 PATH 環境變數..." -ForegroundColor Yellow
