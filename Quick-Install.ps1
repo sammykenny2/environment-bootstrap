@@ -94,35 +94,41 @@ foreach ($scriptName in $installOrder) {
     Write-Host ""
 }
 
-# Step 2: Execute Setup-* scripts (order doesn't matter, use alphabetical)
+# Step 2: Execute Setup-* scripts in specified order
 Write-Info "Phase 2: Setting up development environment"
 Write-Host ""
 
-$setupScripts = Get-ChildItem -Path $PlatformDir -Filter "Setup-*.ps1" -ErrorAction SilentlyContinue |
-    Sort-Object Name
+# Define Setup-* execution order (dependencies matter)
+$setupOrder = @(
+    "Setup-Python.ps1",         # Install pyenv-win first
+    "Setup-PythonPackages.ps1", # Depends on pyenv-win
+    "Setup-NodePackages.ps1"    # Independent (Node.js already installed)
+)
 
-if ($setupScripts) {
-    foreach ($script in $setupScripts) {
-        $toolName = $script.BaseName -replace '^Setup-', ''
-        Write-Info "Setting up $toolName..."
+foreach ($scriptName in $setupOrder) {
+    $scriptPath = Join-Path $PlatformDir $scriptName
 
-        & $script.FullName
-
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host ""
-            Write-Host "❌ $toolName setup failed with exit code $LASTEXITCODE" -ForegroundColor Red
-            Write-Host "Setup cannot continue" -ForegroundColor Red
-            Write-Host "Please check the error messages above and try again" -ForegroundColor Yellow
-            Write-Host ""
-            Read-Host "Press Enter to exit"
-            exit 1
-        }
-
-        Write-Success "$toolName setup completed"
-        Write-Host ""
+    if (-not (Test-Path $scriptPath)) {
+        Write-Warning "$scriptName not found, skipping..."
+        continue
     }
-} else {
-    Write-Info "No Setup-* scripts found, skipping development environment setup"
+
+    $toolName = $scriptName -replace '^Setup-(.+)\.ps1$', '$1'
+    Write-Info "Setting up $toolName..."
+
+    & $scriptPath
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "❌ $toolName setup failed with exit code $LASTEXITCODE" -ForegroundColor Red
+        Write-Host "Setup cannot continue" -ForegroundColor Red
+        Write-Host "Please check the error messages above and try again" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+
+    Write-Success "$toolName setup completed"
     Write-Host ""
 }
 
