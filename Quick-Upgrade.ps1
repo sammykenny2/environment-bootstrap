@@ -56,19 +56,19 @@ Write-Step "Upgrading Tools and Packages"
 
 $PlatformDir = Join-Path $ScriptDir "platform\windows"
 
-# Define Install-* execution order (dependencies matter)
-$installOrder = @(
-    "Install-Winget.ps1",       # Foundation: package manager for other tools
-    "Install-Git.ps1",          # Version control (depends on winget, has fallback)
-    "Install-PowerShell.ps1",   # Optional: upgrade to PowerShell 7
-    "Install-NodeJS.ps1"        # Depends on winget
+# Define admin scripts execution order (dependencies matter)
+$adminScripts = @(
+    "Install-Winget-Admin.ps1",       # Foundation: package manager for other tools
+    "Install-Git-Admin.ps1",          # Version control (depends on winget, has fallback)
+    "Install-PowerShell-Admin.ps1",   # Optional: upgrade to PowerShell 7
+    "Install-NodeJS-Admin.ps1"        # Depends on winget
 )
 
 # Step 1: Execute Install-* scripts in specified order
 Write-Info "Phase 1: Upgrading system tools (may require UAC)"
 Write-Host ""
 
-foreach ($scriptName in $installOrder) {
+foreach ($scriptName in $adminScripts) {
     $scriptPath = Join-Path $PlatformDir $scriptName
 
     if (-not (Test-Path $scriptPath)) {
@@ -76,7 +76,7 @@ foreach ($scriptName in $installOrder) {
         continue
     }
 
-    $toolName = $scriptName -replace '^Install-(.+)\.ps1$', '$1'
+    $toolName = $scriptName -replace '^Install-(.+)-Admin\.ps1$', '$1'
     Write-Info "Upgrading $toolName (may require UAC)..."
 
     & $scriptPath -Upgrade
@@ -99,15 +99,15 @@ foreach ($scriptName in $installOrder) {
 Write-Info "Phase 2: Upgrading development packages"
 Write-Host ""
 
-# Define Setup-* execution order (dependencies matter)
-$setupOrder = @(
+# Define user scripts execution order (dependencies matter)
+$userScripts = @(
     "Setup-NodeJS.ps1",         # Configure npm environment
-    "Setup-NodePackages.ps1",   # Depends on Setup-NodeJS.ps1
-    "Setup-Python.ps1",         # Install pyenv-win and Python
-    "Setup-PythonPackages.ps1"  # Depends on Setup-Python.ps1
+    "Install-NodePackages.ps1", # Depends on Setup-NodeJS.ps1
+    "Install-Python.ps1",       # Install pyenv-win and Python
+    "Install-PythonPackages.ps1"  # Depends on Install-Python.ps1
 )
 
-foreach ($scriptName in $setupOrder) {
+foreach ($scriptName in $userScripts) {
     $scriptPath = Join-Path $PlatformDir $scriptName
 
     if (-not (Test-Path $scriptPath)) {
@@ -115,7 +115,7 @@ foreach ($scriptName in $setupOrder) {
         continue
     }
 
-    $toolName = $scriptName -replace '^Setup-(.+)\.ps1$', '$1'
+    $toolName = $scriptName -replace '^(Setup|Install)-(.+)\.ps1$', '$2'
     Write-Info "Upgrading $toolName..."
 
     & $scriptPath -Upgrade
