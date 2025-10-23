@@ -138,29 +138,46 @@ if ($npmExists) {
     $currentNpmVersion = (npm -v).Trim()
     Write-Host "   - 當前 npm 版本：$currentNpmVersion" -ForegroundColor Cyan
 
-    # 检查远程最新版本
+    # 檢查遠程最新版本（帶逾時機制）
     try {
         Write-Host "   - 正在檢查遠程最新版本..." -ForegroundColor Gray
-        $latestNpmVersion = (npm view npm version 2>&1).Trim()
-        
-        if ($currentNpmVersion -eq $latestNpmVersion) {
-            Write-Host "   - npm 已是最新版本 ($currentNpmVersion)，跳過升級" -ForegroundColor Green
-        } else {
-            Write-Host "   - 可升級版本：$currentNpmVersion -> $latestNpmVersion" -ForegroundColor Yellow
-            Write-Host "   - 正在升級 npm..." -ForegroundColor Gray
-            npm install -g npm@latest 2>&1 | Out-Null
 
-            if ($LASTEXITCODE -eq 0) {
-                $newNpmVersion = (npm -v).Trim()
-                Write-Host "   - npm 升級成功！新版本：$newNpmVersion" -ForegroundColor Green
+        # 使用 Start-Job 來實現逾時機制
+        $job = Start-Job -ScriptBlock { npm view npm version 2>&1 }
+        $completed = Wait-Job $job -Timeout 10
+
+        if ($completed) {
+            $latestNpmVersion = (Receive-Job $job).Trim()
+            Remove-Job $job
+
+            if ([string]::IsNullOrEmpty($latestNpmVersion) -or $latestNpmVersion -match 'error|ERR') {
+                Write-Host "   - 無法取得遠程版本，跳過版本比對" -ForegroundColor Yellow
+                Write-Host "   - 當前版本：$currentNpmVersion" -ForegroundColor Cyan
+            } elseif ($currentNpmVersion -eq $latestNpmVersion) {
+                Write-Host "   - npm 已是最新版本 ($currentNpmVersion)，跳過升級" -ForegroundColor Green
             } else {
-                Write-Host "⚠️  npm 升級失敗" -ForegroundColor Yellow
-                exit 1
+                Write-Host "   - 可升級版本：$currentNpmVersion -> $latestNpmVersion" -ForegroundColor Yellow
+                Write-Host "   - 正在升級 npm..." -ForegroundColor Gray
+                npm install -g npm@latest 2>&1 | Out-Null
+
+                if ($LASTEXITCODE -eq 0) {
+                    $newNpmVersion = (npm -v).Trim()
+                    Write-Host "   - npm 升級成功！新版本：$newNpmVersion" -ForegroundColor Green
+                } else {
+                    Write-Host "⚠️  npm 升級失敗" -ForegroundColor Yellow
+                    exit 1
+                }
             }
+        } else {
+            # 逾時：停止 job
+            Stop-Job $job
+            Remove-Job $job
+            Write-Host "   - 檢查遠程版本逾時（可能是網路或 proxy 問題）" -ForegroundColor Yellow
+            Write-Host "   - 跳過版本檢查，保持當前版本：$currentNpmVersion" -ForegroundColor Cyan
         }
     } catch {
-        Write-Host "❌ npm 升級時發生錯誤：$($_.Exception.Message)" -ForegroundColor Red
-        exit 1
+        Write-Host "⚠️  檢查遠程版本時發生錯誤：$($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "   - 跳過版本檢查，保持當前版本：$currentNpmVersion" -ForegroundColor Cyan
     }
 } else {
     Write-Host "❌ 無法找到 npm" -ForegroundColor Red
