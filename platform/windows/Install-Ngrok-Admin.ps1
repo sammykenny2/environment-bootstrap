@@ -95,7 +95,15 @@ if ($ngrokExists) {
     if ($Force) {
         Write-Host "   - 使用 -Force 參數，將強制重新安裝。" -ForegroundColor Yellow
     } elseif ($Upgrade) {
-        Write-Host "   - 使用 -Upgrade 參數，將升級到最新版本。" -ForegroundColor Yellow
+        Write-Host "   ⚠️  注意：Ngrok 沒有公開版本 API，無法自動檢測是否為最新版本" -ForegroundColor Yellow
+        Write-Host "   - 您目前的版本：$ngrokVersion" -ForegroundColor Cyan
+        Write-Host "   - 如需升級，請前往 https://ngrok.com/download 檢查最新版本" -ForegroundColor Cyan
+        Write-Host "   - 如確定需要升級，請使用 -Force 參數強制重新安裝" -ForegroundColor Cyan
+        Write-Host "   - ✓ 已安裝，跳過" -ForegroundColor Green
+        if (-not $NonInteractive) {
+        Read-Host "按 Enter 鍵結束..."
+        }
+        exit 0
     } else {
         Write-Host "   - 無需重複安裝。如需升級請使用 -Upgrade 參數。" -ForegroundColor Cyan
         if (-not $NonInteractive) {
@@ -127,7 +135,7 @@ if ($useWinget) {
             Write-Host "   - 正在安裝 Ngrok..." -ForegroundColor Gray
         }
 
-        $output = Invoke-Expression $command 2>&1 | Out-String
+        Invoke-Expression $command 2>&1 | Out-Null
         $exitCode = $LASTEXITCODE
 
         # Winget exit codes:

@@ -104,7 +104,7 @@ if ($wingetExists) {
         if ($Upgrade -and $pwshExists) {
             # 升級模式
             Write-Host "   - 正在升級 PowerShell 7..." -ForegroundColor Gray
-            $output = winget upgrade --id Microsoft.PowerShell -e --silent --accept-package-agreements --accept-source-agreements 2>&1 | Out-String
+            winget upgrade --id Microsoft.PowerShell -e --silent --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
             $exitCode = $LASTEXITCODE
 
             # Winget exit codes:
@@ -154,8 +154,25 @@ if (-not $wingetSuccess) {
         Write-Host "   - 正在查詢最新版本..." -ForegroundColor Gray
         $apiUrl = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
         $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
-        $version = $release.tag_name -replace '^v', ''
-        Write-Host "   - 最新版本：$version" -ForegroundColor Cyan
+        $latestVersion = $release.tag_name -replace '^v', ''
+        Write-Host "   - 最新版本：$latestVersion" -ForegroundColor Cyan
+
+        # 如果正在升級且已安裝 PowerShell 7，檢查版本是否一致
+        if ($Upgrade -and $pwshExists) {
+            # 提取當前版本號 (PowerShell 7.4.1 -> 7.4.1)
+            $currentVersionRaw = pwsh -v 2>$null
+            if ($currentVersionRaw -match '[\d\.]+') {
+                $currentVersion = $matches[0]
+
+                # 比較版本號
+                if ($currentVersion -eq $latestVersion) {
+                    Write-Host "   - PowerShell 7 已是最新版本 ($currentVersion)，跳過安裝" -ForegroundColor Green
+                    exit 0
+                } else {
+                    Write-Host "   - 當前版本 $currentVersion 將升級到 $latestVersion" -ForegroundColor Yellow
+                }
+            }
+        }
 
         # 找到 x64 MSI 下載連結
         $asset = $release.assets | Where-Object { $_.name -like "*win-x64.msi" } | Select-Object -First 1

@@ -178,8 +178,32 @@ try {
     Write-Host "   - 正在查詢最新版本..." -ForegroundColor Gray
     $apiUrl = "https://api.github.com/repos/microsoft/winget-cli/releases/latest"
     $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
-    $version = $release.tag_name
-    Write-Host "   - 最新版本：$version" -ForegroundColor Cyan
+    $latestVersion = $release.tag_name -replace '^v', ''  # Remove 'v' prefix
+    Write-Host "   - 最新版本：$latestVersion" -ForegroundColor Cyan
+
+    # 如果正在升級且已安裝 winget，檢查版本是否一致
+    if ($Upgrade -and $wingetExists) {
+        # 提取當前版本號 (v1.7.10173 -> 1.7.10173)
+        $currentVersionRaw = winget --version 2>$null
+        if ($currentVersionRaw -match '[\d\.]+') {
+            $currentVersion = $matches[0]
+
+            # 比較版本號
+            if ($currentVersion -eq $latestVersion) {
+                Write-Host "   - winget 已是最新版本 ($currentVersion)，跳過安裝" -ForegroundColor Green
+                Write-Host ""
+                Write-Host "========================================" -ForegroundColor Cyan
+                Write-Host "winget 操作完成！"
+                Write-Host "========================================"
+                if (-not $NonInteractive) {
+                    Read-Host "按 Enter 鍵結束..."
+                }
+                exit 0
+            } else {
+                Write-Host "   - 當前版本 $currentVersion 將升級到 $latestVersion" -ForegroundColor Yellow
+            }
+        }
+    }
 
     # 找到 .msixbundle 下載連結
     $asset = $release.assets | Where-Object { $_.name -like "*.msixbundle" } | Select-Object -First 1
