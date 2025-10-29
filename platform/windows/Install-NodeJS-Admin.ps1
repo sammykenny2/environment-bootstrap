@@ -6,6 +6,7 @@
     Checks and installs Node.js LTS. Includes npm automatically.
     Supports upgrade and force reinstall modes.
     Self-elevates to Administrator when needed.
+    Fallback to direct download from nodejs.org if winget fails.
 
 .PARAMETER Version
     Version to install. Options: LTS (default), Latest, or specific version (e.g., "20.10.0")
@@ -104,15 +105,15 @@ if ($nodeExists) {
 
 # 步驟 3: 檢查 Winget 工具是否存在
 Write-Host "`n3. 正在檢查 Winget 套件管理器..." -ForegroundColor Yellow
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    Write-Host "錯誤：找不到 Winget 工具。此腳本需要 Winget。" -ForegroundColor Red
-    Write-Host "請確認您的 Windows 11 已更新，或從 Microsoft Store 安裝 'App Installer'。"
-    if (-not $NonInteractive) {
-    Read-Host "按 Enter 鍵結束..."
-    }
-    exit 1
+$wingetExists = Get-Command winget -ErrorAction SilentlyContinue
+
+if (-not $wingetExists) {
+    Write-Host "⚠️  未找到 winget，將使用 fallback 方法" -ForegroundColor Yellow
+    $useWinget = $false
+} else {
+    Write-Host "   - winget 檢查通過" -ForegroundColor Green
+    $useWinget = $true
 }
-Write-Host "   - Winget 檢查通過。" -ForegroundColor Green
 
 # 步驟 4: 準備安裝參數
 Write-Host "`n4. 準備安裝參數..." -ForegroundColor Yellow
@@ -137,38 +138,45 @@ switch ($Version) {
 }
 
 # 步驟 5: 執行安裝/升級
+$installSuccess = $false
+
 if ($Upgrade -and $nodeExists) {
     Write-Host "`n5. 正在升級 Node.js..." -ForegroundColor Yellow
     Write-Host "   - 這可能需要幾分鐘時間，請稍候..."
 
-    try {
-        $command = "winget upgrade --id $packageId -e --silent --accept-package-agreements --accept-source-agreements"
-        if ($versionArg) {
-            $command += " $versionArg"
-        }
+    if ($useWinget) {
+        # 方法 A: 使用 winget 升級
+        Write-Host "   - 正在使用 winget 升級..." -ForegroundColor Gray
 
-        Invoke-Expression $command 2>&1 | Out-Null
-        $exitCode = $LASTEXITCODE
+        try {
+            $command = "winget upgrade --id $packageId -e --silent --accept-package-agreements --accept-source-agreements"
+            if ($versionArg) {
+                $command += " $versionArg"
+            }
 
-        # Winget exit codes:
-        # 0 = Success
-        # -1978335189 (0x8A15002B) = No applicable update found (already latest)
+            Invoke-Expression $command 2>&1 | Out-Null
+            $exitCode = $LASTEXITCODE
 
-        if ($exitCode -eq 0) {
-            Write-Host "   - Node.js 升級成功！" -ForegroundColor Green
-        } elseif ($exitCode -eq -1978335189) {
-            Write-Host "   - Node.js 已是最新版本！" -ForegroundColor Green
-        } else {
-            Write-Host ""
-            throw "Winget 升級失敗 (exit code: $exitCode)，請檢查上方 winget 輸出的錯誤訊息。"
+            # Winget exit codes:
+            # 0 = Success
+            # -1978335189 (0x8A15002B) = No applicable update found (already latest)
+
+            if ($exitCode -eq 0) {
+                Write-Host "   - Node.js 升級成功！" -ForegroundColor Green
+                $installSuccess = $true
+            } elseif ($exitCode -eq -1978335189) {
+                Write-Host "   - Node.js 已是最新版本！" -ForegroundColor Green
+                $installSuccess = $true
+            } else {
+                Write-Host "⚠️  winget 升級失敗 (exit code: $exitCode)" -ForegroundColor Yellow
+                Write-Host "⚠️  將嘗試 fallback 方法" -ForegroundColor Yellow
+                $installSuccess = $false
+            }
+        } catch {
+            Write-Host "⚠️  winget 升級發生錯誤：$($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "   - 將嘗試 fallback 方法" -ForegroundColor Yellow
+            $installSuccess = $false
         }
-        Write-Host "   - 重要：您需要開啟一個「新的」PowerShell 視窗來讓環境變數生效。" -ForegroundColor Yellow
-    } catch {
-        Write-Host "錯誤：升級過程中發生問題: $($_.Exception.Message)" -ForegroundColor Red
-        if (-not $NonInteractive) {
-        Read-Host "按 Enter 鍵結束..."
-        }
-        exit 1
     }
 } else {
     # 安裝或強制重裝
@@ -179,30 +187,147 @@ if ($Upgrade -and $nodeExists) {
     }
     Write-Host "   - 這可能需要幾分鐘時間，請稍候..."
 
+    if ($useWinget) {
+        # 方法 A: 使用 winget 安裝
+        Write-Host "   - 正在使用 winget 安裝..." -ForegroundColor Gray
+
+        try {
+            $command = "winget install --id $packageId -e --silent --accept-package-agreements --accept-source-agreements"
+            if ($versionArg) {
+                $command += " $versionArg"
+            }
+            if ($Force) {
+                $command += " --force"
+            }
+
+            Invoke-Expression $command 2>&1 | Out-Null
+
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "   - Node.js 安裝成功！" -ForegroundColor Green
+                $installSuccess = $true
+            } else {
+                Write-Host "⚠️  winget 安裝失敗 (exit code: $LASTEXITCODE)" -ForegroundColor Yellow
+                Write-Host "⚠️  將嘗試 fallback 方法" -ForegroundColor Yellow
+                $installSuccess = $false
+            }
+        } catch {
+            Write-Host "⚠️  winget 安裝發生錯誤：$($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "   - 將嘗試 fallback 方法" -ForegroundColor Yellow
+            $installSuccess = $false
+        }
+    }
+}
+
+# 方法 B: Fallback - 從 nodejs.org 下載 MSI
+if (-not $installSuccess) {
+    Write-Host "`n5. 正在從 nodejs.org 下載 Node.js 安裝器..." -ForegroundColor Yellow
+
     try {
-        $command = "winget install --id $packageId -e --silent --accept-package-agreements --accept-source-agreements"
-        if ($versionArg) {
-            $command += " $versionArg"
-        }
-        if ($Force) {
-            $command += " --force"
+        # 取得最新版本資訊
+        Write-Host "   - 正在查詢最新版本..." -ForegroundColor Gray
+        $apiUrl = "https://nodejs.org/dist/index.json"
+        $releases = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+
+        # 根據 Version 參數決定要下載的版本
+        $targetRelease = $null
+        if ($Version -eq "LTS") {
+            # 找最新的 LTS 版本
+            $targetRelease = $releases | Where-Object { $_.lts -ne $false } | Select-Object -First 1
+            $targetVersion = $targetRelease.version -replace '^v', ''
+            Write-Host "   - 最新 LTS 版本：$targetVersion" -ForegroundColor Cyan
+        } elseif ($Version -eq "Latest") {
+            # 找最新版本
+            $targetRelease = $releases | Select-Object -First 1
+            $targetVersion = $targetRelease.version -replace '^v', ''
+            Write-Host "   - 最新版本：$targetVersion" -ForegroundColor Cyan
+        } else {
+            # 特定版本
+            $targetVersion = $Version
+            $targetRelease = $releases | Where-Object { $_.version -eq "v$Version" } | Select-Object -First 1
+            if (-not $targetRelease) {
+                throw "找不到指定版本 $Version"
+            }
+            Write-Host "   - 目標版本：$targetVersion" -ForegroundColor Cyan
         }
 
-        Invoke-Expression $command
+        # 如果正在升級且已安裝 Node.js，檢查版本是否一致
+        if ($Upgrade -and $nodeExists -and $targetVersion) {
+            # 提取當前版本號 (v20.10.0 -> 20.10.0)
+            $currentVersionRaw = node -v 2>$null
+            if ($currentVersionRaw -match 'v?(.+)$') {
+                $currentVersion = $matches[1].Trim()
 
-        if ($LASTEXITCODE -ne 0) {
-            throw "Winget 安裝失敗，請檢查網路連線或錯誤訊息。"
+                # 比較版本號
+                if ($currentVersion -eq $targetVersion) {
+                    Write-Host "   - Node.js 已是最新版本 ($currentVersion)，跳過安裝" -ForegroundColor Green
+                    $installSuccess = $true
+                } else {
+                    Write-Host "   - 當前版本 $currentVersion 將升級到 $targetVersion" -ForegroundColor Yellow
+                }
+            }
         }
 
-        Write-Host "   - Node.js 安裝成功！" -ForegroundColor Green
-        Write-Host "   - 重要：您需要開啟一個「新的」PowerShell 視窗來讓環境變數生效。" -ForegroundColor Yellow
+        # 如果已經確認版本一致，跳過下載和安裝
+        if ($installSuccess) {
+            # 版本檢查通過，無需下載
+        } else {
+            # 構建下載 URL
+            $downloadUrl = "https://nodejs.org/dist/v$targetVersion/node-v$targetVersion-x64.msi"
+            $msiPath = "$env:TEMP\node-v$targetVersion-x64.msi"
+
+            # 下載 MSI (with progress)
+            Write-Host "   - 正在下載 Node.js 安裝器..." -ForegroundColor Gray
+            $ProgressPreference = 'Continue'  # Show download progress
+            try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $msiPath -UseBasicParsing
+                Write-Host "   - 下載完成！" -ForegroundColor Green
+            } finally {
+                $ProgressPreference = 'SilentlyContinue'  # Restore default
+            }
+
+            # 安裝 MSI
+            Write-Host "   - 正在執行安裝..." -ForegroundColor Gray
+            $msiArgs = @(
+                "/i", $msiPath,
+                "/qn",  # Quiet mode, no user interaction
+                "/norestart"
+            )
+
+            if ($Force) {
+                $msiArgs += "REINSTALLMODE=vamus"
+                $msiArgs += "REINSTALL=ALL"
+            }
+
+            $installProcess = Start-Process msiexec.exe -ArgumentList $msiArgs -Wait -PassThru
+
+            # 清理下載檔案
+            Remove-Item -Path $msiPath -Force -ErrorAction SilentlyContinue
+
+            if ($installProcess.ExitCode -eq 0) {
+                Write-Host "   - Node.js 安裝成功！" -ForegroundColor Green
+                $installSuccess = $true
+            } else {
+                throw "MSI 安裝失敗，退出碼：$($installProcess.ExitCode)"
+            }
+        }
+
     } catch {
-        Write-Host "錯誤：安裝過程中發生問題: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "❌ Node.js 安裝失敗：$($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "   - 請手動從 https://nodejs.org/ 下載安裝" -ForegroundColor Yellow
         if (-not $NonInteractive) {
         Read-Host "按 Enter 鍵結束..."
         }
         exit 1
     }
+}
+
+# 驗證安裝成功
+if (-not $installSuccess) {
+    Write-Host "❌ Node.js 安裝/升級失敗" -ForegroundColor Red
+    if (-not $NonInteractive) {
+    Read-Host "按 Enter 鍵結束..."
+    }
+    exit 1
 }
 
 # --- 完成 ---

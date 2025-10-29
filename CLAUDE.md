@@ -112,14 +112,67 @@ git subtree add --prefix=scripts/bootstrap \
 
 Keep this usage pattern in mind when suggesting structural changes - maintain self-contained, relocatable structure.
 
+## Fallback Method Architecture
+
+**CRITICAL**: Most `*-Admin.ps1` scripts implement a two-tier installation approach:
+
+1. **Primary Method**: Use winget (Windows Package Manager)
+   - Fast, standardized, handles dependencies
+   - May fail due to network, source issues, or unavailability
+
+2. **Fallback Method**: Direct download from official sources
+   - **MUST include version detection** to avoid redundant downloads
+   - Query official APIs (GitHub releases, nodejs.org, etc.) for latest version
+   - Compare with installed version before downloading
+   - Only download if version differs or on `-Force` flag
+
+### Fallback Version Detection Pattern
+
+```powershell
+# Get latest version from API
+$latestVersion = ... # from GitHub API / official API
+
+# Get current installed version
+$currentVersion = ... # from command output (git --version, node -v, etc.)
+
+# Compare and skip if already latest
+if ($currentVersion -eq $latestVersion) {
+    Write-Host "Already latest version, skipping"
+    $installSuccess = $true
+} else {
+    # Download and install
+}
+```
+
+### Scripts with Fallback Support
+
+| Script | Fallback Source | Version API |
+|--------|----------------|-------------|
+| **Install-Git-Admin.ps1** | GitHub Releases | `api.github.com/repos/git-for-windows/git/releases/latest` |
+| **Install-PowerShell-Admin.ps1** | GitHub Releases | `api.github.com/repos/PowerShell/PowerShell/releases/latest` |
+| **Install-Winget-Admin.ps1** | GitHub Releases | `api.github.com/repos/microsoft/winget-cli/releases/latest` |
+| **Install-NodeJS-Admin.ps1** | nodejs.org | `nodejs.org/dist/index.json` |
+| **Install-Ngrok-Admin.ps1** | ngrok.com | ⚠️ No API (uses stable URL, shows warning in `-Upgrade` mode) |
+| **Install-Python.ps1** | pyenv-win + GitHub | Uses pyenv for version management (no version check needed in `-Upgrade` mode) |
+
+### Version String Extraction Notes
+
+- **Git**: Returns `git version 2.51.2.windows.1` → Extract full string with `'git version (.+)$'`
+- **PowerShell**: Returns `PowerShell 7.4.1` → Extract with `'[\d\.]+'`
+- **Winget**: Returns `v1.7.10173` → Extract with `'[\d\.]+'`
+- **NodeJS**: Returns `v20.10.0` → Extract with `'v?(.+)$'`
+
 ## Recent Changes Context
 
 Recent improvements (2025-10) focused on:
-- Smart upgrade detection (winget exit code recognition)
+- **Fallback method version detection** (Git, PowerShell, Winget, NodeJS): Prevent redundant downloads when already latest version
+- **NodeJS fallback support**: Added nodejs.org direct download with full LTS/Latest/specific version support
+- **Git version extraction fix**: Correctly parse `2.51.2.windows.1` format (was extracting `2.51.2.` incorrectly)
+- **Ngrok upgrade behavior**: Skip reinstall in `-Upgrade` mode when already installed, show manual check instructions
+- Smart upgrade detection (winget exit code `-1978335189` recognition)
 - UTF-8 BOM support for all scripts
 - Rename `Check-Environment.ps1` → `Check-Installation.ps1` and relocate to `platform/windows/`
 - Progress bars for downloads
-- Fix Python upgrade mode to avoid reinstalling pyenv-win
 
 ## User Experience Standards
 
