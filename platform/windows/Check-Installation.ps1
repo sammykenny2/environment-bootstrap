@@ -6,19 +6,29 @@
     Checks if all required tools and environment variables are properly configured.
     This is a read-only diagnostic script.
 
+.PARAMETER Full
+    Check full installation (includes WSL2, Docker, Ngrok). Default: Quick mode only.
+
 .PARAMETER AllowAdmin
     Allow execution with admin privileges (for Administrator accounts only)
 
 .EXAMPLE
-    .\Check-Environment.ps1
-    Check environment setup with standard output
+    .\Check-Installation.ps1
+    Check Quick installation (Node.js, Python, Git, PowerShell)
 
 .EXAMPLE
-    .\Check-Environment.ps1 -AllowAdmin
+    .\Check-Installation.ps1 -Full
+    Check Full installation (includes WSL2, Docker, Ngrok)
+
+.EXAMPLE
+    .\Check-Installation.ps1 -AllowAdmin
     For Administrator accounts: allow execution with admin privileges
 #>
 
 param(
+    [Parameter(Mandatory=$false)]
+    [switch]$Full,
+
     [Parameter(Mandatory=$false)]
     [switch]$AllowAdmin
 )
@@ -111,14 +121,61 @@ try {
     Write-Host "⚪ Git: 未安裝或不在 PATH 中" -ForegroundColor Gray
 }
 
-# 檢查 Docker
-try {
-    $dockerVersion = docker --version 2>$null
-    if ($dockerVersion) {
-        Write-Host "✅ Docker: $dockerVersion" -ForegroundColor Green
+# Full 模式才檢查以下工具
+if ($Full) {
+    # 檢查 WSL2
+    try {
+        $wslVersion = wsl --version 2>$null
+        if ($LASTEXITCODE -eq 0 -and $wslVersion) {
+            Write-Host "✅ WSL2: 已安裝" -ForegroundColor Green
+
+            # 列出已安裝的發行版
+            $distros = wsl --list --quiet 2>$null
+            if ($distros) {
+                $distroList = $distros | Where-Object { $_ -and $_ -notmatch "^Windows" }
+                if ($distroList) {
+                    $distroCount = ($distroList | Measure-Object).Count
+                    Write-Host "   └─ 已安裝 $distroCount 個發行版" -ForegroundColor DarkGreen
+                }
+            }
+        }
+    } catch {
+        Write-Host "❌ WSL2: 未安裝" -ForegroundColor Red
+        $missing = $true
     }
-} catch {
-    Write-Host "⚪ Docker: 未安裝 (容器化部署需要)" -ForegroundColor Gray
+
+    # 檢查 Docker
+    try {
+        $dockerVersion = docker --version 2>$null
+        if ($dockerVersion) {
+            Write-Host "✅ Docker: $dockerVersion" -ForegroundColor Green
+
+            # 檢查 Docker Engine 是否運行
+            $dockerInfo = docker info 2>$null
+            if ($LASTEXITCODE -eq 0 -and $dockerInfo) {
+                Write-Host "   └─ Docker Engine: 運行中" -ForegroundColor DarkGreen
+            } else {
+                Write-Host "   └─ Docker Engine: 未運行（請啟動 Docker Desktop）" -ForegroundColor Yellow
+            }
+        }
+    } catch {
+        Write-Host "❌ Docker: 未安裝" -ForegroundColor Red
+        $missing = $true
+    }
+
+    # 檢查 Ngrok
+    try {
+        $ngrokVersionOutput = ngrok version 2>$null
+        if ($ngrokVersionOutput -match 'ngrok version ([\d\.]+)') {
+            $ngrokVersion = $matches[1]
+            Write-Host "✅ Ngrok: v$ngrokVersion" -ForegroundColor Green
+        } elseif ($ngrokVersionOutput) {
+            Write-Host "✅ Ngrok: 已安裝" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "❌ Ngrok: 未安裝" -ForegroundColor Red
+        $missing = $true
+    }
 }
 
 Write-Host ""
@@ -142,11 +199,12 @@ Write-Host ""
 Write-Host "[PATH 環境變數內容]" -ForegroundColor Yellow
 $pathDirs = $env:PATH -split ';'
 $relevantPaths = $pathDirs | Where-Object {
-    $_ -match 'node|npm|git|python|docker' -or
+    $_ -match 'node|npm|git|python|docker|ngrok|wsl' -or
     $_ -match 'Program Files.*node' -or
     $_ -match 'Program Files.*git' -or
     $_ -match 'Program Files.*python' -or
-    $_ -match 'Program Files.*Docker'
+    $_ -match 'Program Files.*Docker' -or
+    $_ -match 'Program Files.*ngrok'
 }
 
 if ($relevantPaths) {
