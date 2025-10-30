@@ -94,7 +94,8 @@ if ($gitVersion) {
 # 步驟 2: 讀取 .env 文件
 Write-Host "`n2. 正在讀取配置..." -ForegroundColor Yellow
 
-$ScriptRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+# Setup-Git.ps1 位於 platform\windows\，需要往上兩層到 repository root
+$ScriptRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $envPath = Join-Path $ScriptRoot ".env"
 $envExamplePath = Join-Path $ScriptRoot ".env.example"
 
