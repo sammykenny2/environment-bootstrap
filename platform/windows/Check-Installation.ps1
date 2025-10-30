@@ -183,8 +183,9 @@ if ($Full) {
         $wslCommand = Get-Command wsl -ErrorAction SilentlyContinue
         if ($wslCommand) {
             # 嘗試在預設 WSL 發行版中檢查 cursor-agent
+            # 使用 bash -lc（login shell）以載入 .bashrc/.profile 中的 PATH
             $checkCommand = "command -v cursor-agent >/dev/null 2>&1 && cursor-agent --version 2>&1 || echo 'not-installed'"
-            $cursorAgentCheck = wsl bash -c $checkCommand 2>$null
+            $cursorAgentCheck = wsl bash -lc $checkCommand 2>$null
 
             if ($cursorAgentCheck -and $cursorAgentCheck -ne "not-installed") {
                 Write-Host "✅ Cursor Agent CLI: 已安裝" -ForegroundColor Green
