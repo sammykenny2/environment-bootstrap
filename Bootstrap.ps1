@@ -101,41 +101,72 @@ Write-Host ""
 Write-Host "✓ 已選擇：$installMode Mode" -ForegroundColor Green
 Write-Host ""
 
-# 步驟 1: 下載 repository
+# 步驟 0.5: 檢測本地 repository
 Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor DarkGray
-Write-Host "[1/5] 正在下載環境安裝工具..." -ForegroundColor Yellow
+Write-Host "正在檢測環境..." -ForegroundColor Yellow
 
-$repoUrl = "https://github.com/sammykenny2/environment-bootstrap/archive/refs/heads/main.zip"
-$zipFile = "$env:TEMP\env-bootstrap-$(Get-Date -Format 'yyyyMMdd-HHmmss').zip"
-$extractPath = "$env:TEMP\env-bootstrap-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-$repoDir = "$extractPath\environment-bootstrap-main"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$quickInstallExists = Test-Path (Join-Path $scriptDir "Quick-Install.ps1")
+$fullInstallExists = Test-Path (Join-Path $scriptDir "Full-Install.ps1")
+$platformDirExists = Test-Path (Join-Path $scriptDir "platform\windows")
 
-try {
-    Invoke-WebRequest -Uri $repoUrl -OutFile $zipFile -UseBasicParsing
-    Write-Host "   ✓ 下載完成" -ForegroundColor Green
-} catch {
-    Write-Host "❌ 下載失敗：$($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "請檢查網路連線或稍後再試" -ForegroundColor Yellow
-    Read-Host "按 Enter 鍵結束..."
-    exit 1
-}
+$isLocalRepo = $quickInstallExists -and $fullInstallExists -and $platformDirExists
+$needsCleanup = $false
 
-# 步驟 2: 解壓縮
-Write-Host "`n[2/5] 正在解壓縮..." -ForegroundColor Yellow
+if ($isLocalRepo) {
+    Write-Host "   ✓ 檢測到本地 repository，將使用本地文件" -ForegroundColor Green
+    $repoDir = $scriptDir
+    $totalSteps = 2  # 本地模式：配置 + 安裝
+    $configStepNum = 1
+    $installStepNum = 2
+} else {
+    Write-Host "   → 本地文件不完整，將從 GitHub 下載" -ForegroundColor Cyan
+    $totalSteps = 5  # 遠端模式：下載 + 解壓 + 配置 + 安裝 + 清理
+    $configStepNum = 3
+    $installStepNum = 4
+    $cleanupStepNum = 5
+    $needsCleanup = $true
 
-try {
-    Expand-Archive -Path $zipFile -DestinationPath $extractPath -Force
-    Write-Host "   ✓ 解壓縮完成" -ForegroundColor Green
-} catch {
-    Write-Host "❌ 解壓縮失敗：$($_.Exception.Message)" -ForegroundColor Red
-    Read-Host "按 Enter 鍵結束..."
-    exit 1
+    # 步驟 1: 下載 repository
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+    Write-Host "[1/5] 正在下載環境安裝工具..." -ForegroundColor Yellow
+
+    $repoUrl = "https://github.com/sammykenny2/environment-bootstrap/archive/refs/heads/main.zip"
+    $zipFile = "$env:TEMP\env-bootstrap-$(Get-Date -Format 'yyyyMMdd-HHmmss').zip"
+    $extractPath = "$env:TEMP\env-bootstrap-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    $repoDir = "$extractPath\environment-bootstrap-main"
+
+    try {
+        Invoke-WebRequest -Uri $repoUrl -OutFile $zipFile -UseBasicParsing
+        Write-Host "   ✓ 下載完成" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ 下載失敗：$($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "請檢查網路連線或稍後再試" -ForegroundColor Yellow
+        Read-Host "按 Enter 鍵結束..."
+        exit 1
+    }
+
+    # 步驟 2: 解壓縮
+    Write-Host "`n[2/5] 正在解壓縮..." -ForegroundColor Yellow
+
+    try {
+        Expand-Archive -Path $zipFile -DestinationPath $extractPath -Force
+        Write-Host "   ✓ 解壓縮完成" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ 解壓縮失敗：$($_.Exception.Message)" -ForegroundColor Red
+        Read-Host "按 Enter 鍵結束..."
+        exit 1
+    }
 }
 
 # 步驟 3: 配置向導
-Write-Host "`n[3/5] 配置設定..." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "[$configStepNum/$totalSteps] 配置設定..." -ForegroundColor Yellow
 
 $envFilePath = Join-Path $repoDir ".env"
+$envExamplePath = Join-Path $repoDir ".env.example"
 
 if (Test-Path $envFilePath) {
     Write-Host "   ✓ 找到現有的 .env 配置文件" -ForegroundColor Green
@@ -199,7 +230,23 @@ if (Test-Path $envFilePath) {
         Write-Host ""
         Write-Host "正在創建 .env 配置文件..." -ForegroundColor Cyan
 
-        $envContent = @"
+        try {
+            if (Test-Path $envExamplePath) {
+                # 從 .env.example 複製並替換變數
+                $envContent = Get-Content $envExamplePath -Raw -Encoding UTF8
+
+                # 使用正則表達式替換變數值 (multiline mode)
+                $envContent = $envContent -replace '(?m)^GIT_USER_NAME=.*$', "GIT_USER_NAME=$gitUserName"
+                $envContent = $envContent -replace '(?m)^GIT_USER_EMAIL=.*$', "GIT_USER_EMAIL=$gitUserEmail"
+                $envContent = $envContent -replace '(?m)^NGROK_AUTHTOKEN=.*$', "NGROK_AUTHTOKEN=$ngrokAuthToken"
+
+                Set-Content -Path $envFilePath -Value $envContent -Encoding UTF8
+                Write-Host "   ✓ .env 文件創建完成（從 .env.example）" -ForegroundColor Green
+            } else {
+                # Fallback: .env.example 不存在，創建基本 .env
+                Write-Host "   ⚠️  未找到 .env.example，將創建基本配置" -ForegroundColor Yellow
+
+                $envContent = @"
 # Environment Bootstrap Configuration
 # This file was auto-generated by Bootstrap.ps1
 
@@ -238,9 +285,9 @@ NGROK_AUTHTOKEN=$ngrokAuthToken
 # - For more configuration options, see individual script documentation
 "@
 
-        try {
-            Set-Content -Path $envFilePath -Value $envContent -Encoding UTF8
-            Write-Host "   ✓ .env 文件創建完成" -ForegroundColor Green
+                Set-Content -Path $envFilePath -Value $envContent -Encoding UTF8
+                Write-Host "   ✓ .env 文件創建完成" -ForegroundColor Green
+            }
         } catch {
             Write-Host "   ⚠️  無法創建 .env 文件：$($_.Exception.Message)" -ForegroundColor Yellow
             Write-Host "   配置將在安裝過程中提示" -ForegroundColor Gray
@@ -255,7 +302,7 @@ NGROK_AUTHTOKEN=$ngrokAuthToken
 # 步驟 4: 執行安裝程序
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor DarkGray
-Write-Host "[4/5] 正在執行 $installMode Mode 安裝程序..." -ForegroundColor Yellow
+Write-Host "[$installStepNum/$totalSteps] 正在執行 $installMode Mode 安裝程序..." -ForegroundColor Yellow
 Write-Host "   執行位置：$repoDir" -ForegroundColor Gray
 Write-Host "   子腳本需要時會彈出 UAC 視窗，請允許提權" -ForegroundColor Cyan
 Write-Host ""
@@ -276,17 +323,19 @@ try {
     Pop-Location
 }
 
-# 步驟 5: 清理臨時檔案
-Write-Host ""
-Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor DarkGray
-Write-Host "[5/5] 正在清理臨時檔案..." -ForegroundColor Yellow
+# 步驟 5: 清理臨時檔案 (僅遠端模式)
+if ($needsCleanup) {
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+    Write-Host "[$cleanupStepNum/$totalSteps] 正在清理臨時檔案..." -ForegroundColor Yellow
 
-try {
-    Remove-Item -Path $zipFile -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "   ✓ 清理完成" -ForegroundColor Green
-} catch {
-    Write-Host "   ⚠️  清理臨時檔案時發生錯誤（可忽略）" -ForegroundColor Yellow
+    try {
+        Remove-Item -Path $zipFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "   ✓ 清理完成" -ForegroundColor Green
+    } catch {
+        Write-Host "   ⚠️  清理臨時檔案時發生錯誤（可忽略）" -ForegroundColor Yellow
+    }
 }
 
 # 完成
