@@ -240,7 +240,7 @@ if ($needsUpdate) {
 
     try {
         # 執行 ngrok authtoken 命令
-        $output = ngrok authtoken $envNgrokAuthToken 2>&1
+        $null = ngrok authtoken $envNgrokAuthToken 2>&1
 
         if ($LASTEXITCODE -eq 0) {
             Write-Host "   - ✓ authtoken 設置成功" -ForegroundColor Green

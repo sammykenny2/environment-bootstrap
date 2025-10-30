@@ -131,7 +131,7 @@ if ($packages.Count -eq 0) {
             $action = "升級"
         } else {
             # 檢查是否已安裝
-            $installed = npm list -g $package --depth=0 2>$null
+            $null = npm list -g $package --depth=0 2>$null
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "      ✓ 已安裝，跳過" -ForegroundColor DarkGray
                 continue

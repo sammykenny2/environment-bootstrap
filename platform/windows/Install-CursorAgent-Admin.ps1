@@ -104,7 +104,7 @@ if (-not $wslCommand) {
 }
 
 try {
-    $wslStatus = wsl --status 2>&1
+    $null = wsl --status 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ WSL2 未正確安裝或配置" -ForegroundColor Red
         Write-Host "   - 請先執行：.\Install-WSL2-Admin.ps1" -ForegroundColor Cyan
@@ -125,12 +125,8 @@ $wslList = wsl --list --quiet 2>$null
 $distroExists = $false
 
 if ($wslList) {
-    $wslList | ForEach-Object {
-        $currentDistro = $_.Trim()
-        if ($currentDistro -eq $Distro) {
-            $distroExists = $true
-        }
-    }
+    $trimmedList = $wslList | ForEach-Object { $_.Trim() }
+    $distroExists = $trimmedList -contains $Distro
 }
 
 if (-not $distroExists) {

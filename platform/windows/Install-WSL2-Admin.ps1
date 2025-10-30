@@ -107,7 +107,7 @@ $wslInstalled = $false
 
 if ($wslCommand) {
     try {
-        $wslStatus = wsl --status 2>&1
+        $null = wsl --status 2>&1
         if ($LASTEXITCODE -eq 0) {
             Write-Host "   - WSL 已安裝" -ForegroundColor Green
             $wslInstalled = $true
