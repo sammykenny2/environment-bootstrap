@@ -172,9 +172,41 @@ if ($currentVersion -eq $latestVersion) {
 
 ## Recent Changes Context
 
-Recent improvements (2025-10-30) focused on:
+### Latest Session (2025-10-30 Session 2)
 
-### Full Installation Suite
+**Bootstrap Enhancements:**
+- **Bootstrap.bat verified**: Tested and confirmed working for one-click setup
+- **Local repository detection**: Bootstrap.ps1 checks for Quick-Install.ps1, Full-Install.ps1, and platform\windows directory
+  - If local: Uses local files (2 steps: Config → Install)
+  - If remote: Downloads from GitHub (5 steps: Download → Extract → Config → Install → Cleanup)
+- **Smart .env creation**: Copies from .env.example with regex variable replacement (content-based, not file-based)
+  - Future-proof: new variables in .env.example automatically included
+  - Fallback to hardcoded template if .env.example missing
+
+**Path Calculation Fixes:**
+- **Setup-Git.ps1 and Setup-Ngrok.ps1**: Fixed path calculation bug
+  - Scripts in `platform\windows\` need **3** `Split-Path -Parent` calls to reach repository root
+  - Was using 2 calls (pointed to `platform\` directory instead of repository root)
+  - Now correctly finds .env file in repository root
+
+**Full-* Scripts Reorganization:**
+- **Three-phase execution order**: Clear progression ensures proper dependencies
+  - Phase 1: Quick mode tools (Winget, Git, PowerShell, NodeJS)
+  - Phase 2: Full mode tools (WSL2, Docker, Ngrok, Cursor Agent)
+  - Phase 3: Configuration (Setup-Git, Setup-NodeJS, Setup-Ngrok, Python, packages)
+- **Zero-prompt automation**: All Phase 3 scripts now support `-NonInteractive` parameter
+  - Scripts updated: Setup-NodeJS.ps1, Install-NodePackages.ps1, Install-PythonPackages.ps1, Install-Python.ps1
+  - All Read-Host calls wrapped: `if (-not $NonInteractive) { Read-Host ... }`
+  - Full-* orchestration scripts pass `-NonInteractive` to all Phase 3 script calls
+
+**Bug Fixes:**
+- **Cursor Agent detection**: Changed `wsl bash -c` to `wsl bash -lc` (login shell)
+  - Login shell loads .bashrc/.profile with user PATH
+  - cursor-agent now properly detected in Check-Installation.ps1
+
+### Previous Session (2025-10-30 Session 1)
+
+**Full Installation Suite:**
 - **Full-*.ps1 scripts**: Complete environment setup including WSL2, Docker Desktop, Ngrok, Cursor Agent CLI
 - **Install-WSL2-Admin.ps1**: Automated WSL2 installation with Ubuntu distribution
 - **Install-Docker-Admin.ps1**: Docker Desktop installation with running instance handling
@@ -182,13 +214,13 @@ Recent improvements (2025-10-30) focused on:
 - **Install-CursorAgent-Admin.ps1**: Cursor Agent CLI installation in WSL2 with curl dependency auto-install and SSL fallback
 - **Check-Installation.ps1**: Enhanced with `-Full` parameter to check all tools in Full mode
 
-### Configuration Management
+**Configuration Management:**
 - **Setup-Git.ps1**: Automated Git user.name and user.email configuration from .env
 - **Setup-Ngrok.ps1**: Automated Ngrok authtoken configuration from .env
 - **.env.example cleanup**: Removed unused variables, empty default values with examples in comments
 - **Standard parameter behavior**: All Setup scripts follow Install/Upgrade/Force logic consistently
 
-### Earlier Improvements
+### Earlier Improvements (2025-10)
 - **Fallback method version detection** (Git, PowerShell, Winget, NodeJS): Prevent redundant downloads
 - **NodeJS fallback support**: nodejs.org direct download with full LTS/Latest/specific version support
 - **Git version extraction fix**: Correctly parse `2.51.2.windows.1` format

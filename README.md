@@ -154,23 +154,33 @@ These scripts run with normal user permissions:
 
 ## Recent Improvements (2025-10-30)
 
+### Bootstrap Enhancements
+- **Bootstrap.bat Verified**: One-click launcher tested and working correctly
+- **Local Repository Detection**: Bootstrap.ps1 detects if running from local repo, skips download
+- **Smart .env Creation**: Copies from .env.example with variable substitution (future-proof for new variables)
+- **Path Fixes**: Corrected path calculation in Setup-Git.ps1 and Setup-Ngrok.ps1 (3-level Split-Path)
+
 ### Full Installation Suite
 - **Full Mode Scripts**: Complete environment setup including WSL2, Docker Desktop, Ngrok, Cursor Agent CLI
+- **Three-Phase Execution**: Clear progression (Quick tools → Full tools → Configuration)
+- **Fully Automated**: All scripts support `-NonInteractive` parameter for zero-prompt execution
 - **WSL2 Integration**: Automated Windows Subsystem for Linux 2 installation with Ubuntu
 - **Docker Desktop**: Full Docker Desktop installation with automatic instance handling
 - **Ngrok Support**: Tunneling tool installation with authtoken configuration
-- **Cursor Agent CLI**: AI coding agent installation in WSL2 with curl dependency auto-install and SSL fallback
+- **Cursor Agent CLI**: AI coding agent installation in WSL2 with proper detection (login shell)
 
 ### Configuration Management
 - **Setup-Git.ps1**: Automated Git configuration from .env file (user.name and user.email)
 - **Setup-Ngrok.ps1**: Automated Ngrok authtoken setup from .env file
 - **.env.example Cleanup**: Removed unused variables, empty defaults with examples in comments
 - **Consistent Behavior**: All Setup scripts follow Install/Upgrade/Force parameter logic
+- **Automation Ready**: All user-level scripts support `-NonInteractive` for CI/CD
 
 ### Enhanced Installation Checking
 - **Check-Installation.ps1**: Now supports `-Full` parameter to verify all tools in Full mode
 - **Quick Mode**: Checks essential dev tools only (Git, Node.js, Python, PowerShell)
 - **Full Mode**: Additionally checks WSL2, Docker, Ngrok, and Cursor Agent CLI
+- **Accurate Detection**: Cursor Agent CLI detection uses login shell for proper PATH loading
 
 ### Earlier Improvements (2025-10)
 - **Smart Upgrade Detection**: Recognizes winget exit code `-1978335189` as "already up-to-date"
