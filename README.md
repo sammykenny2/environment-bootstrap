@@ -6,10 +6,12 @@
 
 - 🎯 **One-Click Setup**: Bootstrap.bat for instant environment setup
 - 🔄 **Smart Upgrade**: Detects already-installed packages to avoid redundant downloads
-- 🌐 **Multi-Platform Tools**: Node.js, Python, Git, PowerShell 7, and more
+- 🌐 **Multi-Platform Tools**: Node.js, Python, Git, PowerShell 7, WSL2, Docker, Ngrok, Cursor Agent CLI
 - ⚡ **Fast & Efficient**: Download progress bars and intelligent caching
 - 🔒 **User-Friendly**: Automatic admin elevation when needed
 - 🛡️ **Safe Defaults**: User-scoped installations to avoid permission issues
+- 🐳 **Full Mode**: Complete containerized environment with WSL2 and Docker Desktop
+- ⚙️ **Auto-Configuration**: Git and Ngrok setup from .env file
 
 ## Quick Start
 
@@ -34,6 +36,15 @@ Double-click `Bootstrap.bat` to automatically:
 
 # Force reinstall everything
 .\Quick-Reinstall.ps1
+
+# Full installation (includes WSL2, Docker, Ngrok, Cursor Agent)
+.\Full-Install.ps1
+
+# Full upgrade
+.\Full-Upgrade.ps1
+
+# Full reinstall
+.\Full-Reinstall.ps1
 ```
 
 ### Common Operations
@@ -50,8 +61,17 @@ Double-click `Bootstrap.bat` to automatically:
 .\platform\windows\Install-NodePackages.ps1
 .\platform\windows\Install-PythonPackages.ps1
 
-# Check installation
+# Check installation (Quick mode)
 .\platform\windows\Check-Installation.ps1
+
+# Check installation (Full mode - includes WSL2/Docker/Ngrok/Cursor Agent)
+.\platform\windows\Check-Installation.ps1 -Full
+
+# Setup Git configuration from .env
+.\platform\windows\Setup-Git.ps1
+
+# Setup Ngrok authtoken from .env
+.\platform\windows\Setup-Ngrok.ps1
 ```
 
 ## Directory Structure
@@ -60,9 +80,15 @@ Double-click `Bootstrap.bat` to automatically:
 environment-bootstrap/
 ├── Bootstrap.ps1          Main bootstrap script (PowerShell)
 ├── Bootstrap.bat          Launcher with execution policy handling
-├── Quick-Install.ps1      One-command full installation
-├── Quick-Upgrade.ps1      Upgrade all installed tools
-├── Quick-Reinstall.ps1    Force reinstall everything
+├── .env.example           Configuration template
+│
+├── Quick-Install.ps1      Quick mode: Essential dev tools
+├── Quick-Upgrade.ps1      Quick mode: Upgrade all tools
+├── Quick-Reinstall.ps1    Quick mode: Force reinstall
+│
+├── Full-Install.ps1       Full mode: Complete environment (Quick + WSL2/Docker/Ngrok/Cursor Agent)
+├── Full-Upgrade.ps1       Full mode: Upgrade everything
+├── Full-Reinstall.ps1     Full mode: Force reinstall everything
 │
 ├── platform/windows/      Platform-specific tools and utilities
 │   ├── Check-Installation.ps1        - Verify installation status
@@ -70,8 +96,14 @@ environment-bootstrap/
 │   ├── Install-Git-Admin.ps1         - Git for Windows
 │   ├── Install-PowerShell-Admin.ps1  - PowerShell 7
 │   ├── Install-NodeJS-Admin.ps1      - Node.js LTS
+│   ├── Install-WSL2-Admin.ps1        - Windows Subsystem for Linux 2
+│   ├── Install-Docker-Admin.ps1      - Docker Desktop
+│   ├── Install-Ngrok-Admin.ps1       - Ngrok tunneling tool
+│   ├── Install-CursorAgent-Admin.ps1 - Cursor Agent CLI (in WSL2)
 │   ├── Install-Python.ps1            - Python with pyenv-win (no admin)
+│   ├── Setup-Git.ps1                 - Configure Git from .env (no admin)
 │   ├── Setup-NodeJS.ps1              - Configure npm (no admin)
+│   ├── Setup-Ngrok.ps1               - Configure Ngrok authtoken from .env (no admin)
 │   ├── Install-NodePackages.ps1      - Global npm packages (no admin)
 │   └── Install-PythonPackages.ps1    - Python packages (no admin)
 │
@@ -90,6 +122,10 @@ These scripts automatically request admin privileges when needed:
 | `Install-Git-Admin.ps1` | Git for Windows | `-Upgrade`, `-Force` |
 | `Install-PowerShell-Admin.ps1` | PowerShell 7 | `-Upgrade`, `-Force` |
 | `Install-NodeJS-Admin.ps1` | Node.js LTS | `-Upgrade`, `-Force`, `-Version` |
+| `Install-WSL2-Admin.ps1` | Windows Subsystem for Linux 2 | `-Upgrade`, `-Force`, `-Distro` |
+| `Install-Docker-Admin.ps1` | Docker Desktop | `-Upgrade`, `-Force` |
+| `Install-Ngrok-Admin.ps1` | Ngrok tunneling tool | `-Upgrade`, `-Force` |
+| `Install-CursorAgent-Admin.ps1` | Cursor Agent CLI (in WSL2) | `-Upgrade`, `-Force`, `-Distro` |
 
 ### User Scripts (No Admin Required)
 
@@ -98,7 +134,9 @@ These scripts run with normal user permissions:
 | Script | Purpose | Parameters |
 |--------|---------|------------|
 | `Install-Python.ps1` | Python with pyenv-win | `-Upgrade`, `-Force`, `-PythonVersion` |
+| `Setup-Git.ps1` | Configure Git user.name/email from .env | `-Upgrade`, `-Force`, `-UserName`, `-UserEmail` |
 | `Setup-NodeJS.ps1` | Configure npm prefix | `-Upgrade` |
+| `Setup-Ngrok.ps1` | Configure Ngrok authtoken from .env | `-Upgrade`, `-Force`, `-AuthToken` |
 | `Install-NodePackages.ps1` | Global npm packages | `-Upgrade`, `-Force` |
 | `Install-PythonPackages.ps1` | Python development packages | `-Upgrade`, `-Force` |
 
@@ -107,30 +145,39 @@ These scripts run with normal user permissions:
 | Script | Purpose |
 |--------|---------|
 | `Bootstrap.ps1` | Interactive full setup with choices |
-| `Quick-Install.ps1` | Non-interactive full installation |
-| `Quick-Upgrade.ps1` | Upgrade all tools to latest versions |
-| `Quick-Reinstall.ps1` | Force reinstall everything |
+| `Quick-Install.ps1` | Quick mode: Install essential dev tools |
+| `Quick-Upgrade.ps1` | Quick mode: Upgrade all tools |
+| `Quick-Reinstall.ps1` | Quick mode: Force reinstall everything |
+| `Full-Install.ps1` | Full mode: Install complete environment (Quick + WSL2/Docker/Ngrok/Cursor Agent) |
+| `Full-Upgrade.ps1` | Full mode: Upgrade everything |
+| `Full-Reinstall.ps1` | Full mode: Force reinstall everything |
 
-## Recent Improvements (2025-10)
+## Recent Improvements (2025-10-30)
 
-### Smart Upgrade Detection
-- **Exit Code Recognition**: Correctly identifies winget exit code `-1978335189` as "already up-to-date"
+### Full Installation Suite
+- **Full Mode Scripts**: Complete environment setup including WSL2, Docker Desktop, Ngrok, Cursor Agent CLI
+- **WSL2 Integration**: Automated Windows Subsystem for Linux 2 installation with Ubuntu
+- **Docker Desktop**: Full Docker Desktop installation with automatic instance handling
+- **Ngrok Support**: Tunneling tool installation with authtoken configuration
+- **Cursor Agent CLI**: AI coding agent installation in WSL2 with curl dependency auto-install and SSL fallback
+
+### Configuration Management
+- **Setup-Git.ps1**: Automated Git configuration from .env file (user.name and user.email)
+- **Setup-Ngrok.ps1**: Automated Ngrok authtoken setup from .env file
+- **.env.example Cleanup**: Removed unused variables, empty defaults with examples in comments
+- **Consistent Behavior**: All Setup scripts follow Install/Upgrade/Force parameter logic
+
+### Enhanced Installation Checking
+- **Check-Installation.ps1**: Now supports `-Full` parameter to verify all tools in Full mode
+- **Quick Mode**: Checks essential dev tools only (Git, Node.js, Python, PowerShell)
+- **Full Mode**: Additionally checks WSL2, Docker, Ngrok, and Cursor Agent CLI
+
+### Earlier Improvements (2025-10)
+- **Smart Upgrade Detection**: Recognizes winget exit code `-1978335189` as "already up-to-date"
 - **No Redundant Downloads**: Skips downloads when packages are already latest version
+- **Fallback Support**: Version detection for Git, PowerShell, Winget, NodeJS
+- **UTF-8 BOM Support**: All scripts properly encoded for Chinese character support
 - **Progress Feedback**: Download progress bars for better user experience
-
-### Install-Python.ps1 Critical Fixes
-- **Upgrade Mode Fix**: No longer reinstalls pyenv-win on every upgrade
-- **Version Preservation**: Python installations are preserved during upgrades
-- **Accurate Messaging**: "Checking" vs "Upgrading" based on actual operation
-
-### UTF-8 BOM Support
-- All PowerShell scripts now have UTF-8 BOM for Windows PowerShell compatibility
-- Prevents Chinese character corruption and parser errors
-
-### User Experience
-- More accurate status messages ("Checking/Processing" instead of "Installing")
-- Better version number extraction with robust regex matching
-- Clearer operation feedback (install/upgrade/skip)
 
 ## Integration with Other Projects
 
@@ -168,12 +215,19 @@ your-project/
 
 ## Installed Tools
 
-### Core Platform Tools
+### Quick Mode (Essential Development Tools)
 - **winget**: Windows Package Manager (foundation for all tools)
 - **Git**: Version control with Git for Windows
 - **PowerShell 7**: Modern PowerShell (optional)
 - **Node.js**: JavaScript runtime with npm
 - **Python**: Python with pyenv-win for version management
+
+### Full Mode (Additional Tools)
+All Quick Mode tools plus:
+- **WSL2**: Windows Subsystem for Linux 2 with Ubuntu
+- **Docker Desktop**: Complete Docker environment with WSL2 backend
+- **Ngrok**: Secure tunneling to localhost
+- **Cursor Agent CLI**: AI coding agent (installed in WSL2)
 
 ### Development Packages
 
@@ -204,6 +258,22 @@ All install scripts support these parameters:
 - `-NonInteractive`: Run without user prompts (for automation)
 - `-AllowAdmin`: Allow execution with admin privileges (for Administrator accounts)
 
+### Configuration File
+
+Create `.env` file from `.env.example` for automatic configuration:
+
+```bash
+# Copy and edit
+cp .env.example .env
+
+# Configure Git
+GIT_USER_NAME=Your Name
+GIT_USER_EMAIL=your.email@example.com
+
+# Configure Ngrok (optional, for Full mode)
+NGROK_AUTHTOKEN=your_token_here
+```
+
 ### Examples
 
 ```powershell
@@ -216,8 +286,17 @@ All install scripts support these parameters:
 # Force reinstall Git
 .\platform\windows\Install-Git-Admin.ps1 -Force
 
-# Automated upgrade (no prompts)
-.\Quick-Upgrade.ps1
+# Setup Git configuration from .env
+.\platform\windows\Setup-Git.ps1
+
+# Setup Ngrok authtoken from .env
+.\platform\windows\Setup-Ngrok.ps1 -Force
+
+# Install WSL2 with specific distribution
+.\platform\windows\Install-WSL2-Admin.ps1 -Distro "Ubuntu-22.04"
+
+# Automated full upgrade (no prompts)
+.\Full-Upgrade.ps1
 ```
 
 ## Troubleshooting
@@ -282,11 +361,15 @@ MIT License - see [LICENSE](LICENSE) file for details
 - [x] Smart upgrade detection (winget exit codes)
 - [x] UTF-8 BOM support for Chinese characters
 - [x] Download progress bars
+- [x] Docker Desktop installation
+- [x] WSL2 integration
+- [x] Git configuration automation
+- [x] Ngrok setup automation
+- [x] Cursor Agent CLI support
 - [ ] macOS support
 - [ ] Linux support (Ubuntu, Fedora)
-- [ ] Docker Desktop installation
 - [ ] IDE setup automation (VS Code)
-- [ ] Git configuration templates
+- [ ] Multiple Git profile management
 
 ## Support
 
@@ -294,5 +377,5 @@ For issues or feature requests, please open an issue on GitHub.
 
 ---
 
-**Last Updated**: 2025-10-22
-**Version**: 1.1.0 (fix/polish-scripts)
+**Last Updated**: 2025-10-30
+**Version**: 1.2.0 (feature/add-utility-scripts)

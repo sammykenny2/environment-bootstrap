@@ -135,6 +135,7 @@ Write-Host ""
 
 # Define user scripts execution order (dependencies matter)
 $userScripts = @(
+    "Setup-Git.ps1",            # Configure Git user settings
     "Setup-NodeJS.ps1",         # Configure npm environment
     "Install-NodePackages.ps1", # Depends on Setup-NodeJS.ps1
     "Install-Python.ps1",       # Install pyenv-win and Python

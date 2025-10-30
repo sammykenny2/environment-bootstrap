@@ -193,13 +193,71 @@ if ($checkResult -match "installed") {
     Write-Host "   - 系統中未找到 Cursor Agent CLI，準備開始安裝。" -ForegroundColor Gray
 }
 
-# 步驟 4: 安裝/升級 Cursor Agent CLI
-Write-Host "`n4. 正在安裝 Cursor Agent CLI..." -ForegroundColor Yellow
+# 步驟 4: 檢查 WSL 中是否有 curl
+Write-Host "`n4. 正在檢查 WSL 中的 curl..." -ForegroundColor Yellow
+
+$curlCheckCommand = "command -v curl >/dev/null 2>&1 && echo 'installed' || echo 'not-installed'"
+$curlCheck = wsl -d $Distro bash -c $curlCheckCommand 2>$null
+
+if ($curlCheck -notmatch "installed") {
+    Write-Host "   - 未找到 curl，正在安裝..." -ForegroundColor Yellow
+
+    # 嘗試安裝 curl（支援不同的包管理器）
+    $installCurlCommand = @"
+if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -qq && sudo apt-get install -y curl
+elif command -v yum >/dev/null 2>&1; then
+    sudo yum install -y curl
+elif command -v apk >/dev/null 2>&1; then
+    sudo apk add curl
+else
+    echo 'error: no package manager found'
+    exit 1
+fi
+"@
+
+    try {
+        $curlInstallOutput = wsl -d $Distro bash -c $installCurlCommand 2>&1
+
+        if ($curlInstallOutput -match "error: no package manager found") {
+            Write-Host "❌ 無法安裝 curl：未找到支援的包管理器" -ForegroundColor Red
+            Write-Host "   - 請手動在 WSL 中安裝 curl" -ForegroundColor Yellow
+            if (-not $NonInteractive) {
+                Read-Host "按 Enter 鍵結束..."
+            }
+            exit 1
+        }
+
+        # 驗證 curl 是否安裝成功
+        $curlVerify = wsl -d $Distro bash -c $curlCheckCommand 2>$null
+        if ($curlVerify -match "installed") {
+            Write-Host "   - curl 安裝成功 ✓" -ForegroundColor Green
+        } else {
+            Write-Host "❌ curl 安裝失敗" -ForegroundColor Red
+            Write-Host "   - 請手動在 WSL 中執行：sudo apt-get install curl" -ForegroundColor Yellow
+            if (-not $NonInteractive) {
+                Read-Host "按 Enter 鍵結束..."
+            }
+            exit 1
+        }
+    } catch {
+        Write-Host "❌ curl 安裝過程發生錯誤：$($_.Exception.Message)" -ForegroundColor Red
+        if (-not $NonInteractive) {
+            Read-Host "按 Enter 鍵結束..."
+        }
+        exit 1
+    }
+} else {
+    Write-Host "   - curl 檢查通過 ✓" -ForegroundColor Green
+}
+
+# 步驟 5: 安裝/升級 Cursor Agent CLI
+Write-Host "`n5. 正在安裝 Cursor Agent CLI..." -ForegroundColor Yellow
 Write-Host "   - 這可能需要幾分鐘時間，請稍候..." -ForegroundColor Gray
 
 $installSuccess = $false
 
-# 構建安裝命令
+# 方法 A: 標準安裝（使用 HTTPS）
 $installCommand = "curl https://cursor.com/install -fsSL | bash"
 
 Write-Host "`n執行安裝腳本..." -ForegroundColor Cyan
@@ -238,18 +296,71 @@ try {
         }
     } else {
         Write-Host ""
-        Write-Host "❌ 無法驗證 Cursor Agent CLI 安裝" -ForegroundColor Red
-        Write-Host "   - 安裝腳本可能未正確完成" -ForegroundColor Yellow
+        Write-Host "⚠️  標準安裝方法未成功" -ForegroundColor Yellow
+        Write-Host "   - 可能是網路連線或 SSL 憑證問題" -ForegroundColor Gray
         $installSuccess = $false
     }
 
 } catch {
     Write-Host ""
-    Write-Host "❌ 安裝過程中發生錯誤：$($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "⚠️  標準安裝發生錯誤：$($_.Exception.Message)" -ForegroundColor Yellow
     $installSuccess = $false
 }
 
-# 步驟 5: 顯示結果和使用說明
+# 方法 B: Fallback - 使用 --ssl-no-revoke（適用於防火牆環境）
+if (-not $installSuccess) {
+    Write-Host ""
+    Write-Host "嘗試 Fallback 方法（繞過 SSL 憑證驗證）..." -ForegroundColor Yellow
+    Write-Host "   - 適用於企業防火牆環境" -ForegroundColor Gray
+
+    $fallbackCommand = "curl --ssl-no-revoke -fsSL https://cursor.com/install | bash"
+    Write-Host "   Command: $fallbackCommand" -ForegroundColor DarkGray
+
+    try {
+        # 在 WSL 中執行 fallback 安裝
+        $fallbackOutput = wsl -d $Distro bash -c $fallbackCommand 2>&1
+
+        # 顯示安裝輸出
+        if ($fallbackOutput) {
+            Write-Host ""
+            Write-Host "安裝輸出：" -ForegroundColor Gray
+            $fallbackOutput | ForEach-Object {
+                Write-Host "   $_" -ForegroundColor DarkGray
+            }
+        }
+
+        # 等待安裝完成後檢查
+        Start-Sleep -Seconds 2
+
+        # 驗證安裝
+        $verifyCommand = "command -v cursor-agent >/dev/null 2>&1 && echo 'success' || echo 'failed'"
+        $verifyResult = wsl -d $Distro bash -c $verifyCommand 2>$null
+
+        if ($verifyResult -match "success") {
+            $installSuccess = $true
+            Write-Host ""
+            Write-Host "✅ Cursor Agent CLI 安裝成功（使用 Fallback 方法）！" -ForegroundColor Green
+
+            # 獲取版本信息
+            $versionCommand = "cursor-agent --version 2>&1 || echo 'unknown'"
+            $newVersion = wsl -d $Distro bash -c $versionCommand 2>$null
+            if ($newVersion -and $newVersion -ne "unknown") {
+                Write-Host "   - 版本：$newVersion" -ForegroundColor Gray
+            }
+        } else {
+            Write-Host ""
+            Write-Host "❌ Fallback 方法也無法完成安裝" -ForegroundColor Red
+            $installSuccess = $false
+        }
+
+    } catch {
+        Write-Host ""
+        Write-Host "❌ Fallback 安裝發生錯誤：$($_.Exception.Message)" -ForegroundColor Red
+        $installSuccess = $false
+    }
+}
+
+# 步驟 6: 顯示結果和使用說明
 Write-Host ""
 if ($installSuccess) {
     Write-Host "╔══════════════════════════════════════════════════════════╗" -ForegroundColor Green
@@ -299,14 +410,22 @@ if ($installSuccess) {
     Write-Host "1. 確認 WSL2 正常運作：" -ForegroundColor Cyan
     Write-Host "   wsl -d $Distro uname -a" -ForegroundColor White
     Write-Host ""
-    Write-Host "2. 確認網路連線正常：" -ForegroundColor Cyan
+    Write-Host "2. 確認 curl 已安裝：" -ForegroundColor Cyan
+    Write-Host "   wsl -d $Distro curl --version" -ForegroundColor White
+    Write-Host "   如未安裝：wsl -d $Distro sudo apt-get install curl" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "3. 確認網路連線正常：" -ForegroundColor Cyan
     Write-Host "   wsl -d $Distro curl -I https://cursor.com" -ForegroundColor White
     Write-Host ""
-    Write-Host "3. 手動在 WSL 中安裝：" -ForegroundColor Cyan
+    Write-Host "4. 手動在 WSL 中安裝（標準方法）：" -ForegroundColor Cyan
     Write-Host "   wsl -d $Distro" -ForegroundColor White
     Write-Host "   curl https://cursor.com/install -fsSL | bash" -ForegroundColor White
     Write-Host ""
-    Write-Host "4. 查看安裝日誌（如果有）：" -ForegroundColor Cyan
+    Write-Host "5. 手動在 WSL 中安裝（防火牆環境）：" -ForegroundColor Cyan
+    Write-Host "   wsl -d $Distro" -ForegroundColor White
+    Write-Host "   curl --ssl-no-revoke -fsSL https://cursor.com/install | bash" -ForegroundColor White
+    Write-Host ""
+    Write-Host "6. 查看安裝日誌：" -ForegroundColor Cyan
     Write-Host "   檢查上方的安裝輸出以獲取錯誤信息" -ForegroundColor Gray
     Write-Host ""
 
