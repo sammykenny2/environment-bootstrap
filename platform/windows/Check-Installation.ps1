@@ -176,6 +176,32 @@ if ($Full) {
         Write-Host "❌ Ngrok: 未安裝" -ForegroundColor Red
         $missing = $true
     }
+
+    # 檢查 Cursor Agent CLI（在 WSL 中）
+    try {
+        # 檢查 WSL 是否可用
+        $wslCommand = Get-Command wsl -ErrorAction SilentlyContinue
+        if ($wslCommand) {
+            # 嘗試在預設 WSL 發行版中檢查 cursor-agent
+            $checkCommand = "command -v cursor-agent >/dev/null 2>&1 && cursor-agent --version 2>&1 || echo 'not-installed'"
+            $cursorAgentCheck = wsl bash -c $checkCommand 2>$null
+
+            if ($cursorAgentCheck -and $cursorAgentCheck -ne "not-installed") {
+                Write-Host "✅ Cursor Agent CLI: 已安裝" -ForegroundColor Green
+                if ($cursorAgentCheck -notmatch "not-installed") {
+                    Write-Host "   └─ 版本：$($cursorAgentCheck.Trim())" -ForegroundColor DarkGreen
+                }
+            } else {
+                Write-Host "❌ Cursor Agent CLI: 未安裝" -ForegroundColor Red
+                $missing = $true
+            }
+        } else {
+            Write-Host "⚪ Cursor Agent CLI: 需要 WSL2（未檢查）" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Host "❌ Cursor Agent CLI: 未安裝或檢查失敗" -ForegroundColor Red
+        $missing = $true
+    }
 }
 
 Write-Host ""

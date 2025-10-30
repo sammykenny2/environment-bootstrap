@@ -6,7 +6,7 @@
     Installs all platform tools including Docker/WSL2 and sets up development packages.
     Install-* scripts will self-elevate when needed (UAC prompts).
     Setup-* scripts run with normal user permissions.
-    Includes: Winget, Git, PowerShell, NodeJS, WSL2, Docker, Ngrok, Python
+    Includes: Winget, Git, PowerShell, NodeJS, WSL2, Docker, Ngrok, Cursor Agent CLI, Python
 
 .PARAMETER AllowAdmin
     Allow execution with admin privileges (for Administrator accounts only)
@@ -99,6 +99,7 @@ $adminScripts = @(
     "Install-NodeJS-Admin.ps1",       # Depends on winget (has fallback)
     "Install-WSL2-Admin.ps1",         # Windows Subsystem for Linux 2
     "Install-Docker-Admin.ps1",       # Docker Desktop (depends on WSL2)
+    "Install-CursorAgent-Admin.ps1",  # Cursor Agent CLI (depends on WSL2)
     "Install-Ngrok-Admin.ps1"         # Ngrok tunneling tool
 )
 
@@ -200,7 +201,7 @@ Write-Success "All tools installed successfully"
 Write-Host ""
 Write-Info "Installed tools:"
 Write-Host "  - Winget, Git, PowerShell 7, Node.js, npm" -ForegroundColor White
-Write-Host "  - WSL2, Docker Desktop, Ngrok" -ForegroundColor White
+Write-Host "  - WSL2, Docker Desktop, Ngrok, Cursor Agent CLI" -ForegroundColor White
 Write-Host "  - Python (via pyenv-win), pip" -ForegroundColor White
 Write-Host ""
 Write-Info "Next steps:"
