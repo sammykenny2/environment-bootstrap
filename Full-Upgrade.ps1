@@ -91,23 +91,58 @@ Write-Step "Upgrading Tools and Packages"
 
 $PlatformDir = Join-Path $ScriptDir "platform\windows"
 
-# Define admin scripts execution order (dependencies matter)
-$adminScripts = @(
+# Define Quick mode admin scripts (common tools)
+$quickAdminScripts = @(
     "Install-Winget-Admin.ps1",       # Foundation: package manager for other tools
     "Install-Git-Admin.ps1",          # Version control (depends on winget, has fallback)
     "Install-PowerShell-Admin.ps1",   # Optional: upgrade to PowerShell 7
-    "Install-NodeJS-Admin.ps1",       # Depends on winget (has fallback)
-    "Install-WSL2-Admin.ps1",         # Windows Subsystem for Linux 2
-    "Install-Docker-Admin.ps1",       # Docker Desktop (depends on WSL2)
-    "Install-CursorAgent-Admin.ps1",  # Cursor Agent CLI (depends on WSL2)
-    "Install-Ngrok-Admin.ps1"         # Ngrok tunneling tool
+    "Install-NodeJS-Admin.ps1"        # Depends on winget (has fallback)
 )
 
-# Step 1: Execute Install-* scripts in specified order
-Write-Info "Phase 1: Upgrading system tools (may require UAC)"
+# Define Full mode admin scripts (containerization tools)
+$fullAdminScripts = @(
+    "Install-WSL2-Admin.ps1",         # Windows Subsystem for Linux 2
+    "Install-Docker-Admin.ps1",       # Docker Desktop (depends on WSL2)
+    "Install-Ngrok-Admin.ps1",        # Ngrok tunneling tool
+    "Install-CursorAgent-Admin.ps1"   # Cursor Agent CLI (depends on WSL2)
+)
+
+# Step 1a: Execute Quick mode Install-* scripts
+Write-Info "Phase 1: Upgrading Quick mode tools (may require UAC)"
 Write-Host ""
 
-foreach ($scriptName in $adminScripts) {
+foreach ($scriptName in $quickAdminScripts) {
+    $scriptPath = Join-Path $PlatformDir $scriptName
+
+    if (-not (Test-Path $scriptPath)) {
+        Write-Warning "$scriptName not found, skipping..."
+        continue
+    }
+
+    $toolName = $scriptName -replace '^Install-(.+)-Admin\.ps1$', '$1'
+    Write-Info "Upgrading $toolName (may require UAC)..."
+
+    & $scriptPath -Upgrade -NonInteractive
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "❌ $toolName upgrade failed with exit code $LASTEXITCODE" -ForegroundColor Red
+        Write-Host "Upgrade cannot continue" -ForegroundColor Red
+        Write-Host "Please check the error messages above and try again" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+
+    Write-Success "$toolName upgrade completed"
+    Write-Host ""
+}
+
+# Step 1b: Execute Full mode Install-* scripts
+Write-Info "Phase 2: Upgrading Full mode tools - containerization (may require UAC)"
+Write-Host ""
+
+foreach ($scriptName in $fullAdminScripts) {
     $scriptPath = Join-Path $PlatformDir $scriptName
 
     if (-not (Test-Path $scriptPath)) {
@@ -135,7 +170,7 @@ foreach ($scriptName in $adminScripts) {
 }
 
 # Step 2: Execute Setup-* scripts in specified order
-Write-Info "Phase 2: Upgrading development packages"
+Write-Info "Phase 3: Configuring development environment"
 Write-Host ""
 
 # Define user scripts execution order (dependencies matter)
@@ -159,7 +194,7 @@ foreach ($scriptName in $userScripts) {
     $toolName = $scriptName -replace '^(Setup|Install)-(.+)\.ps1$', '$2'
     Write-Info "Upgrading $toolName..."
 
-    & $scriptPath -Upgrade
+    & $scriptPath -Upgrade -NonInteractive
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
