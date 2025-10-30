@@ -95,7 +95,15 @@ if ($ngrokExists) {
     if ($Force) {
         Write-Host "   - 使用 -Force 參數，將強制重新安裝。" -ForegroundColor Yellow
     } elseif ($Upgrade) {
-        Write-Host "   - 使用 -Upgrade 參數，將升級到最新版本。" -ForegroundColor Yellow
+        Write-Host "   ⚠️  注意：Ngrok 沒有公開版本 API，無法自動檢測是否為最新版本" -ForegroundColor Yellow
+        Write-Host "   - 您目前的版本：$ngrokVersion" -ForegroundColor Cyan
+        Write-Host "   - 如需升級，請前往 https://ngrok.com/download 檢查最新版本" -ForegroundColor Cyan
+        Write-Host "   - 如確定需要升級，請使用 -Force 參數強制重新安裝" -ForegroundColor Cyan
+        Write-Host "   - ✓ 已安裝，跳過" -ForegroundColor Green
+        if (-not $NonInteractive) {
+        Read-Host "按 Enter 鍵結束..."
+        }
+        exit 0
     } else {
         Write-Host "   - 無需重複安裝。如需升級請使用 -Upgrade 參數。" -ForegroundColor Cyan
         if (-not $NonInteractive) {
@@ -127,13 +135,22 @@ if ($useWinget) {
             Write-Host "   - 正在安裝 Ngrok..." -ForegroundColor Gray
         }
 
-        Invoke-Expression $command
+        Invoke-Expression $command 2>&1 | Out-Null
+        $exitCode = $LASTEXITCODE
 
-        if ($LASTEXITCODE -eq 0) {
+        # Winget exit codes:
+        # 0 = Success
+        # -1978335189 (0x8A15002B) = No applicable update found (already latest)
+
+        if ($exitCode -eq 0) {
             Write-Host "   - Ngrok 安裝成功！" -ForegroundColor Green
             $installSuccess = $true
+        } elseif (($Upgrade -and $ngrokExists) -and ($exitCode -eq -1978335189)) {
+            Write-Host "   - Ngrok 已是最新版本！" -ForegroundColor Green
+            $installSuccess = $true
         } else {
-            Write-Host "⚠️  winget 安裝失敗，將嘗試 fallback 方法" -ForegroundColor Yellow
+            Write-Host "⚠️  winget 安裝失敗 (exit code: $exitCode)" -ForegroundColor Yellow
+            Write-Host "   - 將嘗試 fallback 方法" -ForegroundColor Yellow
             $installSuccess = $false
         }
     } catch {
@@ -154,7 +171,13 @@ if (-not $installSuccess) {
         $installDir = "$env:ProgramFiles\ngrok"
 
         Write-Host "   - 正在下載 Ngrok..." -ForegroundColor Gray
-        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipFile -UseBasicParsing
+        $ProgressPreference = 'Continue'  # Show download progress
+        try {
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $zipFile -UseBasicParsing
+            Write-Host "   - 下載完成！" -ForegroundColor Green
+        } finally {
+            $ProgressPreference = 'SilentlyContinue'  # Restore default
+        }
 
         Write-Host "   - 正在解壓縮..." -ForegroundColor Gray
 

@@ -135,6 +135,7 @@ Write-Host ""
 
 # Define user scripts execution order (dependencies matter)
 $userScripts = @(
+    "Setup-Git.ps1",            # Configure Git user settings
     "Setup-NodeJS.ps1",         # Configure npm environment
     "Install-NodePackages.ps1", # Depends on Setup-NodeJS.ps1
     "Install-Python.ps1",       # Install pyenv-win and Python
@@ -170,7 +171,7 @@ foreach ($scriptName in $userScripts) {
 
 # Environment check
 Write-Step "Environment Check"
-$CheckScript = Join-Path $ScriptDir "shared\windows\Check-Environment.ps1"
+$CheckScript = Join-Path $ScriptDir "platform\windows\Check-Installation.ps1"
 if (Test-Path $CheckScript) {
     Write-Info "Verifying environment setup..."
     & $CheckScript

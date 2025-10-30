@@ -127,7 +127,7 @@ if ($useWinget) {
             Write-Host "   - 正在安裝 Git..." -ForegroundColor Gray
         }
 
-        $output = Invoke-Expression $command 2>&1 | Out-String
+        Invoke-Expression $command 2>&1 | Out-Null
         $exitCode = $LASTEXITCODE
 
         # Winget exit codes:
@@ -164,6 +164,7 @@ if (-not $installSuccess) {
 
         # Git for Windows 官方下載頁面
         $downloadUrl = "https://github.com/git-for-windows/git/releases/latest/download/Git-2.43.0-64-bit.exe"
+        $latestVersion = $null
 
         # 嘗試從 GitHub API 取得最新版本
         try {
@@ -174,40 +175,65 @@ if (-not $installSuccess) {
             $asset = $release.assets | Where-Object { $_.name -like "*64-bit.exe" -and $_.name -notlike "*rc*" } | Select-Object -First 1
             if ($asset) {
                 $downloadUrl = $asset.browser_download_url
-                Write-Host "   - 檢測到最新版本：$($release.tag_name)" -ForegroundColor Cyan
+                $latestVersion = $release.tag_name -replace '^v', ''  # Remove 'v' prefix
+                Write-Host "   - 檢測到最新版本：$latestVersion" -ForegroundColor Cyan
             }
         } catch {
             Write-Host "   - 無法自動檢測版本，使用預設連結" -ForegroundColor Yellow
         }
 
-        $installerPath = "$env:TEMP\GitInstaller.exe"
+        # 如果正在升級且已安裝 Git，檢查版本是否一致
+        if ($Upgrade -and $gitExists -and $latestVersion) {
+            # 提取當前安裝的版本號 (git version 2.51.2.windows.1)
+            $currentVersionRaw = git --version 2>$null
+            # 匹配完整版本字符串，例如：2.51.2.windows.1 或 2.51.2
+            if ($currentVersionRaw -match 'git version (.+)$') {
+                $currentFullVersion = $matches[1].Trim()
 
-        # 下載安裝器 (with progress)
-        Write-Host "   - 正在下載 Git 安裝器..." -ForegroundColor Gray
-        $ProgressPreference = 'Continue'  # Show download progress
-        try {
-            Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-            Write-Host "   - 下載完成！" -ForegroundColor Green
-        } finally {
-            $ProgressPreference = 'SilentlyContinue'  # Restore default
+                # 比較完整版本（精確比對）
+                if ($currentFullVersion -eq $latestVersion) {
+                    Write-Host "   - Git 已是最新版本 ($currentFullVersion)，跳過安裝" -ForegroundColor Green
+                    $installSuccess = $true
+                } else {
+                    Write-Host "   - 當前版本 $currentFullVersion 將升級到 $latestVersion" -ForegroundColor Yellow
+                }
+            }
         }
 
-        Write-Host "   - 正在執行安裝..." -ForegroundColor Gray
-        Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS" -Wait
-
-        # 清理安裝器
-        Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
-
-        # 刷新環境變數並檢查
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-        $gitExists = Get-Command git -ErrorAction SilentlyContinue
-
-        if ($gitExists) {
-            Write-Host "   - Git 安裝成功！" -ForegroundColor Green
-            $installSuccess = $true
+        # 如果已經確認版本一致，跳過下載和安裝
+        if ($installSuccess) {
+            # 版本檢查通過，無需下載
         } else {
-            throw "Git 安裝後未找到 git 命令"
-        }
+
+            $installerPath = "$env:TEMP\GitInstaller.exe"
+
+            # 下載安裝器 (with progress)
+            Write-Host "   - 正在下載 Git 安裝器..." -ForegroundColor Gray
+            $ProgressPreference = 'Continue'  # Show download progress
+            try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+                Write-Host "   - 下載完成！" -ForegroundColor Green
+            } finally {
+                $ProgressPreference = 'SilentlyContinue'  # Restore default
+            }
+
+            Write-Host "   - 正在執行安裝..." -ForegroundColor Gray
+            Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS" -Wait
+
+            # 清理安裝器
+            Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
+
+            # 刷新環境變數並檢查
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+            $gitExists = Get-Command git -ErrorAction SilentlyContinue
+
+            if ($gitExists) {
+                Write-Host "   - Git 安裝成功！" -ForegroundColor Green
+                $installSuccess = $true
+            } else {
+                throw "Git 安裝後未找到 git 命令"
+            }
+        }  # End of version check else block
     } catch {
         Write-Host "❌ Git 安裝失敗：$($_.Exception.Message)" -ForegroundColor Red
         Write-Host "   - 請手動從 https://git-scm.com/download/win 下載安裝" -ForegroundColor Yellow

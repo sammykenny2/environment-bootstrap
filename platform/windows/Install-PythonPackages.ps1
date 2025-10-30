@@ -17,6 +17,9 @@
 .PARAMETER AllowAdmin
     Allow execution with admin privileges (for Administrator accounts only)
 
+.PARAMETER NonInteractive
+    Run without user prompts (for automation)
+
 .EXAMPLE
     .\Install-PythonPackages.ps1
     Default: Install packages if missing
@@ -32,6 +35,10 @@
 .EXAMPLE
     .\Install-PythonPackages.ps1 -AllowAdmin
     For Administrator accounts: allow execution with admin privileges
+
+.EXAMPLE
+    .\Install-PythonPackages.ps1 -NonInteractive
+    Run without user prompts (for automation)
 #>
 
 param(
@@ -42,7 +49,10 @@ param(
     [switch]$Force,
 
     [Parameter(Mandatory=$false)]
-    [switch]$AllowAdmin
+    [switch]$AllowAdmin,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$NonInteractive
 )
 
 # === Reject Admin Execution (unless explicitly allowed) ===
@@ -58,7 +68,9 @@ if ($isAdmin -and -not $AllowAdmin) {
     Write-Host "如果您是 Administrator 帳戶且確定要繼續，請使用：" -ForegroundColor Cyan
     Write-Host "  .\Install-PythonPackages.ps1 -AllowAdmin" -ForegroundColor White
     Write-Host ""
-    Read-Host "按 Enter 鍵結束..."
+    if (-not $NonInteractive) {
+        Read-Host "按 Enter 鍵結束..."
+    }
     exit 1
 }
 
